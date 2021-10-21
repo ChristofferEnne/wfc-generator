@@ -6,11 +6,14 @@ use rand::{
 use hashbrown::HashSet;
 //use std::collections::HashMap,
 use hashbrown::HashMap;
-use std::{convert::TryInto, fs::File};
+use std::fs::File;
 use std::{ffi::OsStr, io::Write};
 use std::{fmt, slice::Iter};
 
 use std::{fs, path::PathBuf};
+
+mod intersection;
+use crate::intersection::Intersect;
 
 pub struct Tile {
   name: String,
@@ -70,9 +73,10 @@ pub enum PatternSetting {
   PatternBuffer(Vec<Tile>)
 }
 
+#[derive()]
 pub struct WFC {
   tiles: Vec<Tile>,
-  wave: Vec<HashSet<usize>>,
+  wave: Vec<Vec<usize>>,
   entropy: HashMap<usize, usize>,
   adjancencies: Vec<[Vec<usize>; 4]>,
   width: usize,
@@ -93,7 +97,7 @@ impl WFC {
         // Get a iterator over the directory
         let dir_iter = match fs::read_dir(path) {
           Ok(iter) => iter,
-          Err(e) => panic!(e)
+          Err(e) => panic!("{}", e)
         };
 
         // Create the tiles vector
@@ -165,9 +169,9 @@ impl WFC {
     // [cells].[patterns]
     self.wave = Vec::with_capacity(self.cellcount);
     for i in 0..self.cellcount {
-      let mut valids = HashSet::new();
+      let mut valids = Vec::new();
       for t in 0..self.tiles.len() {
-        valids.insert(t);
+        valids.push(t);
       }
       //println!("valids: {:?}", valids);
       self.wave.insert(i, valids);
@@ -255,12 +259,13 @@ impl WFC {
     let mut neihbour_cell = 0;
     let mut selected_pattern: usize = 0;
     let mut stack: Vec<usize> = Vec::with_capacity(self.cellcount);
-    let mut possible = HashSet::<usize>::with_capacity(self.tiles.len());
+    let mut possible: HashSet<usize> = HashSet::with_capacity(self.tiles.len());
     //let mut rng = StdRng::seed_from_u64(self.seed);
     let mut rng = rand::thread_rng();
     // Simple stopping mechanism ---------------------------------------------
     // if entropy list is empty we have collapse all cells
     while !self.entropy.is_empty() {
+      //println!("new wave");
       //println!("cellcnt: {}", self.cellcount);
       //println!("wavelen: {}", self.wave.len());
       // OBSERVATION
@@ -341,6 +346,7 @@ impl WFC {
             // placed on the left of each pattern contained in the
             // current cell.
             possible.clear();
+            //print!("p {:?}", possible);
             // for all possible tiles in base_cell
             for base_tile in &self.wave[base_cell] {
               //print!("dis tiles: {} ", self.tiles[*base_tile].filename);
@@ -363,26 +369,25 @@ impl WFC {
             // (the algorithm skip this neighbor and goes on to the next)
             //println!("subset: {:?} - {:?}", possible,
             // self.wave[&neihbour_cell]);
-            if !self.wave[neihbour_cell].is_subset(&possible) {
+            
+            // there are any patterns from the cell missing in possible 
+            // we must update this cell.
+            //if !self.wave[neihbour_cell].is_subset(&possible) {
               //println!("is subset");
 
               // If it is not a subset of the possible list:
               // —> we look at the intersection of the two sets (all the
               // patterns that can be placed at that location and
               // that, "luckily", are available at that same location)
-              let mut intersection = HashSet::with_capacity(self.wave.len());
-              let mut set = self.wave.get_mut(neihbour_cell);
-              for i in self.wave[neihbour_cell].intersection(&possible) {
-                intersection.insert(i.clone());
-              }
-
-              //println!("intersection: {:?}", intersection);
+              //let mut intersection = HashSet::with_capacity(self.wave.len());
+              //let mut set = self.wave.get_mut(neihbour_cell);
+            if self.wave[neihbour_cell].intersect(&possible) {
 
               // If they don't intersect (patterns that could have been placed
               // there but are not available) it means we ran
               // into a "contradiction". We have to stop the whole WFC
               // algorithm.
-              if intersection.is_empty() {
+              if self.wave[neihbour_cell].is_empty() {
                 self.print_contradiction(base_cell);
                 return false;
               }
@@ -390,7 +395,7 @@ impl WFC {
               // If, on the contrary, they do intersect -> we update the
               // neighboring cell with that refined
               // list of pattern's indices
-              self.wave[neihbour_cell] = intersection;
+              //self.wave[neihbour_cell] = intersection;
 
               // Because that neighboring cell has been updated, its number of
               // valid patterns has decreased and its entropy
@@ -399,9 +404,7 @@ impl WFC {
               // cells we'll end-up with the same minimum entropy
               // value and this prevent to always select the first one of them.
               // It's a cosmetic trick to break the monotony of the animation
-              self
-                .entropy
-                .insert(neihbour_cell, self.wave[neihbour_cell].len());
+              self.entropy.insert(neihbour_cell, self.wave[neihbour_cell].len());
 
               // Finally, and most importantly, we add the index of that
               // neighboring cell to the stack so it becomes the
@@ -436,21 +439,17 @@ impl WFC {
 
   pub fn draw(&self) {
     println!("");
-    //let mut drawing: Vec<String> = vec!["".to_string()];
     for y in 0..self.height {
       for x in 0..self.width {
         if self.wave[(x + (y * self.width))].len() > 1 {
           print!("{}", self.wave[(x + (y * self.width))].len());
         } else {
           let t = self.wave[(x + (y * self.width))].iter().next().unwrap();
-          //drawing.push(self.tiles[*t].filename.clone());
           print!("{}", self.tiles[*t].filename);
         }
       }
-      //drawing.push(r#"\r\n"#.to_string());
       println!("");
     }
-    //println!("{}", drawing.join(""));
   }
 
   pub fn export_csv(&self, path: PathBuf) {
@@ -523,8 +522,6 @@ impl WFC {
       }
     }
     min_index.shuffle(rng);
-
-    //println!("min entropy is {:?} at cell {:?}", min, min_index);
     min_index[0]
   }
 
@@ -544,20 +541,5 @@ impl WFC {
       println!("{} - {:?}", (nx + (ny * self.width)), self.wave.len());
       println!("{} - {:?}", dir, self.wave[(nx + ny * self.width)]);
     }
-  }
-}
-
-trait Sub {
-  fn is_subset_vec(&self, subset: Vec<usize>) -> bool;
-}
-
-impl Sub for HashSet<usize> {
-  fn is_subset_vec(&self, subset: Vec<usize>) -> bool {
-    for i in &subset {
-      if !self.contains(i) {
-        return false;
-      }
-    }
-    true
   }
 }
