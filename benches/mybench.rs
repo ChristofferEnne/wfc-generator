@@ -1,18 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use wfc_generator::{PatternSetting, Tile, WFC};
+use wfc_generator::tile::Tile;
+use wfc_generator::{PatternSetting, WFC};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
   let mut group = c.benchmark_group("generation");
-
-  let mut a = 1;
-  let mut c = 1;
-
   group.bench_function("complete", |b| {
     b.iter(|| {
       let mut wfc = WFC::new(
         PatternSetting::PatternBuffer(pattern_test_buffer()),
-        10,
-        10,
+        50,
+        50,
         0
       );
       wfc.setup();
@@ -20,46 +17,35 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
-  //let mut wfc = WFC::new(
-  //  PatternSetting::PatternBuffer(pattern_test_buffer()),
-  //  10,
-  //  10,
-  //  0
-  //);
-  //group.bench_function("init/gen", |b| {
-  //  b.iter(|| {
-  //    wfc.setup();
-  //    wfc.generate();
-  //  })
-  //});
 
-  /*
-  p = 0;
-  q = 0;
-  group.bench_function("add (threaded)", |b| {
+  group.bench_function("preallocation", |b| {
+    let mut wfc = WFC::new(
+      PatternSetting::PatternBuffer(pattern_test_buffer()),
+      50,
+      50,
+      0
+    );
     b.iter(|| {
-      p += 2;
-      q -= 3;
-      let result = client.send(Ops::AddThreaded(p, q)).unwrap();
-      assert_eq!(result, q + p);
+      wfc.setup();
+      wfc.generate();
     })
   });
-   */
 }
 
 fn pattern_test_buffer() -> Vec<Tile> {
   vec![
-    Tile::new(
-      "O".to_string(),
-      "O".to_string(),
-      0,
-      (
-        "-".to_string(),
-        "-".to_string(),
-        "-".to_string(),
-        "-".to_string()
-      )
-    ),
+    // removed this pattern to get a more steady result
+    //Tile::new(
+    //  "O".to_string(),
+    //  "O".to_string(),
+    //  0,
+    //  (
+    //    "-".to_string(),
+    //    "-".to_string(),
+    //    "-".to_string(),
+    //    "-".to_string()
+    //  )
+    //),
     Tile::new(
       " ".to_string(),
       " ".to_string(),

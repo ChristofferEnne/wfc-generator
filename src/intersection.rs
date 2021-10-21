@@ -5,9 +5,10 @@ pub trait Intersection<T> {
   fn intersection(&mut self, subset: &Vec<&T>) -> bool;
 }
 
-impl<T> Intersection<T> for Vec<T> 
+impl<T> Intersection<T> for Vec<T>
 where
-    T: std::cmp::PartialEq + Copy,{
+  T: std::cmp::PartialEq + Copy
+{
   fn intersection(&mut self, subset: &Vec<&T>) -> bool {
     let mut i = 0;
     let mut j = 0;
@@ -17,14 +18,14 @@ where
       if self[i] != *subset[j] {
         if i < j {
           self.remove(i);
-          updated=true;
-          len-=1;
+          updated = true;
+          len -= 1;
         } else {
-          j+=1;
+          j += 1;
         }
       } else {
-        i+=1;
-        j+=1;
+        i += 1;
+        j += 1;
       }
     }
     updated // was the vector was updated

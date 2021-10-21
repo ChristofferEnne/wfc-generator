@@ -8,66 +8,17 @@ use hashbrown::HashSet;
 use hashbrown::HashMap;
 use std::fs::File;
 use std::{ffi::OsStr, io::Write};
-use std::{fmt, slice::Iter};
 
 use std::{fs, path::PathBuf};
 
+pub mod dir;
 mod intersection;
+pub mod tile;
+use crate::dir::Direction;
 use crate::intersection::Intersect;
+use crate::tile::Tile;
 
-pub struct Tile {
-  name: String,
-  filename: String,
-  rotation: usize,
-  connectors: (String, String, String, String)
-}
 
-impl Tile {
-  pub fn new(
-    name: String,
-    filename: String,
-    rotation: usize,
-    connectors: (String, String, String, String)
-  ) -> Self {
-    Self {
-      name,
-      filename,
-      rotation,
-      connectors
-    }
-  }
-}
-
-enum Direction {
-  West,
-  North,
-  East,
-  South
-}
-
-impl Direction {
-  pub fn iterator() -> Iter<'static, Direction> {
-    static DIRECTIONS: [Direction; 4] = [
-      Direction::West,
-      Direction::North,
-      Direction::East,
-      Direction::South
-    ];
-    DIRECTIONS.iter()
-  }
-}
-
-impl fmt::Debug for Direction {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
-}
-
-impl fmt::Display for Direction {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
-}
 pub enum PatternSetting {
   FromDirectory(PathBuf),
   PatternBuffer(Vec<Tile>)
@@ -82,7 +33,20 @@ pub struct WFC {
   width: usize,
   height: usize,
   cellcount: usize,
-  seed: u64
+  seed: u64,
+
+  min_cell: usize,
+  base_cell: usize,
+  x: usize,
+  y: usize,
+  v: usize,
+  neihbour_cell: usize,
+  selected_pattern: usize,
+  stack: Vec<usize>,
+  possible: HashSet<usize>,
+  rng: StdRng,
+
+  min_entropy: Vec<usize>
 }
 
 impl WFC {
@@ -155,10 +119,25 @@ impl WFC {
       wave: Vec::with_capacity(height * width),
       entropy: HashMap::with_capacity(height * width),
       cellcount: width * height,
+
+      stack: Vec::with_capacity(height * width),
+      possible: HashSet::with_capacity(tiles.len()),
+      rng: StdRng::seed_from_u64(seed),
+
       width,
       height,
       tiles,
-      seed
+      seed,
+
+      min_cell: 0,
+      base_cell: 0,
+      x: 0,
+      y: 0,
+      v: 0,
+      neihbour_cell: 0,
+      selected_pattern: 0,
+      //rng: rand::thread_rng(),
+      min_entropy: Vec::with_capacity(height * width)
     }
   }
 
@@ -186,17 +165,10 @@ impl WFC {
     // share the same value (npat). We must however pick one cell at random and
     // assign a lower value to it. Why ? Because the algorithm in draw() needs
     // to find a cell with the minimum non-zero entropy value.
-    //let H: Vec<usize> = Vec::new();
     self.entropy = HashMap::with_capacity(self.cellcount);
     for i in 0..self.cellcount {
       self.entropy.insert(i, self.tiles.len());
     }
-
-    // replace a random value with a lower one
-    //let rngi = self.rng.gen_range(0..self.width*self.height);
-    //self.entropy.insert(rngi, 1);
-    //self.wave.insert(rngi,
-    // vec![self.rng.gen_range(0..ntiles)].into_iter().collect());
 
     // Array A (for Adjacencies) is an index datastructure that describes the
     // ways that the patterns can be placed near one another. More
@@ -205,8 +177,6 @@ impl WFC {
     for _ in 0..self.tiles.len() {
       self.adjancencies.push([vec![], vec![], vec![], vec![]]);
     }
-
-    //println!("adjancencies: {:?}", adjancencies);
 
     // Computation of patterns compatibilities (check if some patterns are
     // adjacent, if so -> store them based on their location)
@@ -246,97 +216,93 @@ impl WFC {
         }
       }
     }
-    //println!("{:?}", self.adjancencies);
-    //println!("adjancencies: {:?}", adjancencies);
   }
 
   pub fn generate(&mut self) -> bool {
-    let mut min_cell = 0;
-    let mut base_cell = 0;
-    let mut x = 0;
-    let mut y = 0;
-    let mut v = 0;
-    let mut neihbour_cell = 0;
-    let mut selected_pattern: usize = 0;
-    let mut stack: Vec<usize> = Vec::with_capacity(self.cellcount);
-    let mut possible: HashSet<usize> = HashSet::with_capacity(self.tiles.len());
-    //let mut rng = StdRng::seed_from_u64(self.seed);
-    let mut rng = rand::thread_rng();
-    // Simple stopping mechanism ---------------------------------------------
+    // Simple stopping mechanism
     // if entropy list is empty we have collapse all cells
     while !self.entropy.is_empty() {
-      //println!("new wave");
-      //println!("cellcnt: {}", self.cellcount);
-      //println!("wavelen: {}", self.wave.len());
       // OBSERVATION
-      // ----------------------------------------------------------- Find
-      // cell with minimum entropy (not collapsed yet).
-      min_cell = self.get_min_random(&mut rng, &self.entropy);
-      //println!("min entropy cell: {:?}", min_cell);
-      // COLLAPSE --------------------------------------------------------------
+
+      //Find cell with minimum entropy (not collapsed yet).
+      self.v = usize::MAX;
+      self.min_entropy.clear();
+      self.min_cell = {
+        for (index, val) in &self.entropy {
+          if val < &self.v {
+            self.v = *val;
+            self.min_entropy.clear();
+          }
+          if val <= &self.v {
+            self.min_entropy.push(*index);
+          }
+        }
+        self.v = self.rng.gen_range(0..self.min_entropy.len());
+        self.min_entropy[self.v]
+      };
+
+      // COLLAPSE
+
       // Among the patterns available in the selected cell (the one with min
       // entropy), select one pattern randomly, weighted by the frequency
       // that pattern appears in the input image.
-      v = self.wave[min_cell].len();
-      v = rng.gen_range(0..v);
-      selected_pattern =
-        *self.wave[min_cell].iter().collect::<Vec<&usize>>()[v]; // index of selected pattern
+      self.v = self.wave[self.min_cell].len();
+      self.v = self.rng.gen_range(0..self.v);
+      self.selected_pattern =
+        *self.wave[self.min_cell].iter().collect::<Vec<&usize>>()[self.v]; // index of selected pattern
 
-      //println!("we lock in pattern: {:?}", selected_pattern);
 
-      //let id: usize = self.wave[&min_cell].iter().next().unwrap().clone();
       // // index of selected pattern
 
       // The Wave's subarray corresponding to the cell with min entropy should
       // now only contains the id of the selected pattern
       //self.wave[&min_cell].clear();
       //self.wave[&min_cell].insert(selected_pattern);
-      self.wave[min_cell] = vec![selected_pattern].into_iter().collect();
+      self.wave[self.min_cell] =
+        vec![self.selected_pattern].into_iter().collect();
 
       // remove min_cell from entropy to collapse it.
-      self.entropy.remove(&min_cell);
+      self.entropy.remove(&self.min_cell);
 
       // PROPAGATION ----------------------------------------------------------
       // Once a cell is collapsed, its index is put in a stack.
       // That stack is meant later to temporarily store indices of neighoring
       // cells
-      stack.clear();
-      stack.push(min_cell);
+      self.stack.clear();
+      self.stack.push(self.min_cell);
 
       // The propagation will last as long as that stack is filled with indices
-      while !stack.is_empty() {
-        //println!("stack: {:?}", stack);
+      while !self.stack.is_empty() {
         // pop() the last index in stack
         // and get the indices of its 4 neighboring cells (W, N, E, S).
         // We have to keep them withing bounds and make sure they wrap around.
-        base_cell = stack.pop().unwrap(); // index of current cell
+        self.base_cell = self.stack.pop().unwrap(); // index of current cell
 
-        //println!("iwidth {:?} iheight {:?} id_c {:?} iid_c {:?}", iw, ih,
-        // base_cell, icc);
-        x = base_cell % self.width;
-        y = base_cell / self.width;
+        self.x = self.base_cell % self.width;
+        self.y = self.base_cell / self.width;
         for (i, dir) in Direction::iterator().enumerate() {
-          neihbour_cell = match dir {
+          self.neihbour_cell = match dir {
             Direction::West => {
-              (x + self.cellcount - 1) % self.width + y * self.width
+              (self.x + self.cellcount - 1) % self.width + self.y * self.width
             }
             Direction::North => {
-              x + ((y + self.cellcount - 1) % self.height) * self.width
+              self.x
+                + ((self.y + self.cellcount - 1) % self.height) * self.width
             }
             Direction::East => {
-              (x + self.cellcount + 1) % self.width + y * self.width
+              (self.x + self.cellcount + 1) % self.width + self.y * self.width
             }
             Direction::South => {
-              x + ((y + self.cellcount + 1) % self.height) * self.width
+              self.x
+                + ((self.y + self.cellcount + 1) % self.height) * self.width
             }
           };
+
           // index of negihboring cell
-          //println!("dirnr {:?} x {:?}({:?}) y {:?}({:?}) id_n {:?}", dir, x,
-          // coord.0, y, coord.1, neihbour_cell);
 
           // We make sure the neighboring cell is not collapsed yet
           // (we don't want to update a cell that has only 1 pattern available)
-          if self.entropy.contains_key(&neihbour_cell) {
+          if self.entropy.contains_key(&self.neihbour_cell) {
             // Then we check all the patterns that COULD be placed at that
             // location. So all the patterns that fit with the base
             // cell.
@@ -345,19 +311,15 @@ impl WFC {
             // (east side), we look at all the patterns that can be
             // placed on the left of each pattern contained in the
             // current cell.
-            possible.clear();
-            //print!("p {:?}", possible);
+            self.possible.clear();
+
             // for all possible tiles in base_cell
-            for base_tile in &self.wave[base_cell] {
-              //print!("dis tiles: {} ", self.tiles[*base_tile].filename);
-              //print!("pos tiles: ");
+            for base_tile in &self.wave[self.base_cell] {
               // for all tiles that can connect to base_tiles
               for pattern in &self.adjancencies[base_tile.clone()][i] {
-                possible.insert(pattern.clone());
-                //print!(r#""{}" "#, self.tiles[*pattern].filename);
+                self.possible.insert(pattern.clone());
               }
             }
-            //println!("");
 
             // We also look at the patterns that ARE available in the
             // neighboring cell
@@ -367,35 +329,27 @@ impl WFC {
             // in the list of all the possible patterns:
             // —> there’s no need to update it
             // (the algorithm skip this neighbor and goes on to the next)
-            //println!("subset: {:?} - {:?}", possible,
-            // self.wave[&neihbour_cell]);
-            
-            // there are any patterns from the cell missing in possible 
+
+            // there are any patterns from the cell missing in possible
             // we must update this cell.
-            //if !self.wave[neihbour_cell].is_subset(&possible) {
-              //println!("is subset");
 
-              // If it is not a subset of the possible list:
-              // —> we look at the intersection of the two sets (all the
-              // patterns that can be placed at that location and
-              // that, "luckily", are available at that same location)
-              //let mut intersection = HashSet::with_capacity(self.wave.len());
-              //let mut set = self.wave.get_mut(neihbour_cell);
-            if self.wave[neihbour_cell].intersect(&possible) {
-
+            // If it is not a subset of the possible list:
+            // —> we look at the intersection of the two sets (all the
+            // patterns that can be placed at that location and
+            // that, "luckily", are available at that same location)
+            if self.wave[self.neihbour_cell].intersect(&self.possible) {
               // If they don't intersect (patterns that could have been placed
               // there but are not available) it means we ran
               // into a "contradiction". We have to stop the whole WFC
               // algorithm.
-              if self.wave[neihbour_cell].is_empty() {
-                self.print_contradiction(base_cell);
+              if self.wave[self.neihbour_cell].is_empty() {
+                self.print_contradiction(self.base_cell);
                 return false;
               }
 
               // If, on the contrary, they do intersect -> we update the
               // neighboring cell with that refined
               // list of pattern's indices
-              //self.wave[neihbour_cell] = intersection;
 
               // Because that neighboring cell has been updated, its number of
               // valid patterns has decreased and its entropy
@@ -404,14 +358,16 @@ impl WFC {
               // cells we'll end-up with the same minimum entropy
               // value and this prevent to always select the first one of them.
               // It's a cosmetic trick to break the monotony of the animation
-              self.entropy.insert(neihbour_cell, self.wave[neihbour_cell].len());
+              self.entropy.insert(
+                self.neihbour_cell,
+                self.wave[self.neihbour_cell].len()
+              );
 
               // Finally, and most importantly, we add the index of that
               // neighboring cell to the stack so it becomes the
               // next current cell in turns (the one whose neighbors will be
               // updated during the next while loop)
-              stack.push(neihbour_cell);
-              //println!("pushed to stack");
+              self.stack.push(self.neihbour_cell);
             }
           } else {
             //println!("does not contain key");
@@ -503,27 +459,6 @@ impl WFC {
   //    Ok(_) => println!("successfully wrote to {}", display)
   //  }
   //}
-
-  fn get_min_random(
-    &self,
-    rng: &mut ThreadRng,
-    map: &HashMap<usize, usize>
-  ) -> usize {
-    let mut min = usize::MAX;
-    let mut min_index = vec![];
-
-    for (index, val) in map {
-      if *val < min {
-        min = *val;
-        min_index.clear();
-      }
-      if *val <= min {
-        min_index.push(*index);
-      }
-    }
-    min_index.shuffle(rng);
-    min_index[0]
-  }
 
   fn print_contradiction(&self, index: usize) {
     println!("contradiction found:");

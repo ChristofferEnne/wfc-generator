@@ -2,7 +2,8 @@
 mod tests {
   use std::path::{Path, PathBuf};
 
-  use wfc_generator::{PatternSetting, Tile, WFC};
+  use wfc_generator::tile::Tile;
+  use wfc_generator::{PatternSetting, WFC};
 
   #[test]
   fn pattern_buffer() {
