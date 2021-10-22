@@ -1,22 +1,35 @@
 pub struct Tile {
   pub name: String,
-  pub filename: String,
-  pub rotation: usize,
-  pub connectors: (String, String, String, String)
+  pub filename: String
 }
 
 impl Tile {
   pub fn new(
     name: String,
-    filename: String,
-    rotation: usize,
-    connectors: (String, String, String, String)
+    filename: String
   ) -> Self {
     Self {
       name,
-      filename,
+      filename
+    }
+  }
+}
+
+pub struct TileContainer {
+  pub tiles: Vec<Tile>,
+  pub connectors: (usize, usize, usize, usize),
+  pub rotation: usize,
+}
+
+impl TileContainer {
+  pub fn new(
+    connectors: (usize, usize, usize, usize),
+    rotation: usize
+  ) -> Self {
+    Self {
+      tiles: Vec::new(),
+      connectors,
       rotation,
-      connectors
     }
   }
 }

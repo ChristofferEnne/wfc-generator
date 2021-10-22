@@ -6,6 +6,7 @@ use rand::{
 use hashbrown::HashSet;
 //use std::collections::HashMap,
 use hashbrown::HashMap;
+use tile::TileContainer;
 use std::{fmt::format, fs::File};
 use std::{ffi::OsStr, io::Write};
 
@@ -26,7 +27,7 @@ pub enum PatternSetting {
 
 #[derive()]
 pub struct WFC {
-  tiles: Vec<Tile>,
+  tiles: Vec<TileContainer>,
   wave: Vec<Vec<usize>>,
   entropy: HashMap<usize, usize>,
   adjancencies: Vec<[Vec<usize>; 4]>,
