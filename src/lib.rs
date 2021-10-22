@@ -6,7 +6,7 @@ use rand::{
 use hashbrown::HashSet;
 //use std::collections::HashMap,
 use hashbrown::HashMap;
-use std::fs::File;
+use std::{fmt::format, fs::File};
 use std::{ffi::OsStr, io::Write};
 
 use std::{fs, path::PathBuf};
@@ -46,7 +46,9 @@ pub struct WFC {
   possible: HashSet<usize>,
   rng: StdRng,
 
-  min_entropy: Vec<usize>
+  min_entropy: Vec<usize>,
+  
+  keep: Vec<usize>,
 }
 
 impl WFC {
@@ -121,6 +123,7 @@ impl WFC {
       cellcount: width * height,
 
       stack: Vec::with_capacity(height * width),
+      keep: Vec::with_capacity(tiles.len()),
       possible: HashSet::with_capacity(tiles.len()),
       rng: StdRng::seed_from_u64(seed),
 
@@ -137,7 +140,7 @@ impl WFC {
       neihbour_cell: 0,
       selected_pattern: 0,
       //rng: rand::thread_rng(),
-      min_entropy: Vec::with_capacity(height * width)
+      min_entropy: Vec::with_capacity(height * width),
     }
   }
 
@@ -256,8 +259,6 @@ impl WFC {
 
       // The Wave's subarray corresponding to the cell with min entropy should
       // now only contains the id of the selected pattern
-      //self.wave[&min_cell].clear();
-      //self.wave[&min_cell].insert(selected_pattern);
       self.wave[self.min_cell] =
         vec![self.selected_pattern].into_iter().collect();
 
@@ -312,7 +313,6 @@ impl WFC {
             // placed on the left of each pattern contained in the
             // current cell.
             self.possible.clear();
-
             // for all possible tiles in base_cell
             for base_tile in &self.wave[self.base_cell] {
               // for all tiles that can connect to base_tiles
@@ -337,7 +337,17 @@ impl WFC {
             // —> we look at the intersection of the two sets (all the
             // patterns that can be placed at that location and
             // that, "luckily", are available at that same location)
-            if self.wave[self.neihbour_cell].intersect(&self.possible) {
+            self.keep.clear();
+            self.v = self.wave[self.neihbour_cell].len();
+            for entry in &self.wave[self.neihbour_cell] {
+              if self.possible.contains(&entry) {
+                self.keep.push(*entry);
+              }
+            }
+            if self.keep.len() < self.v {
+               std::mem::swap(&mut self.wave[self.neihbour_cell], &mut self.keep);
+
+            //if self.wave[self.neihbour_cell].intersect(&self.possible) {
               // If they don't intersect (patterns that could have been placed
               // there but are not available) it means we ran
               // into a "contradiction". We have to stop the whole WFC
@@ -439,26 +449,34 @@ impl WFC {
     }
   }
 
-  //pub fn export_bytes(&self, path: PathBuf) {
-  //  let display = path.display();
-  //
-  //  // Open a file in write-only mode, returns `io::Result<File>`
-  //  let mut file = match File::create(&path) {
-  //    Err(why) => panic!("couldn't create {}: {}", display, why),
-  //    Ok(file) => file
-  //  };
-  //
-  //  // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
-  //  let mut data: Vec<u8> = Vec::with_capacity(self.cellcount);
-  //  for map in &self.wave {
-  //    data.push(map.0 as u8);
-  //  }
-  //
-  //  match file.write_all(&data) {
-  //    Err(why) => panic!("couldn't write to {}: {}", display, why),
-  //    Ok(_) => println!("successfully wrote to {}", display)
-  //  }
-  //}
+  pub fn export_bytes(&self, path: PathBuf) {
+    let display = path.display();
+  
+    // Open a file in write-only mode, returns `io::Result<File>`
+    let mut file = match File::create(&path) {
+      Err(why) => panic!("couldn't create {}: {}", display, why),
+      Ok(file) => file
+    };
+  
+    let mut data1: Vec<String> = Vec::new();
+    let mut data2: Vec<String> = Vec::with_capacity(self.cellcount);
+    data1.push(format!("row name,cells"));
+    for cell in &self.wave {
+      data2.push(cell[0].to_string());
+    }
+    data1.push(format!(r#"data,"{}""#, data2.join(",")));
+
+    //// Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
+    //let mut data: Vec<u8> = Vec::with_capacity(self.cellcount);
+    //for map in &self.wave {
+    //  data.push(map.0 as u8);
+    //}
+  
+    match file.write_all(data1.join("\n").as_bytes()) {
+      Err(why) => panic!("couldn't write to {}: {}", display, why),
+      Ok(_) => println!("successfully wrote to {}", display)
+    }
+  }
 
   fn print_contradiction(&self, index: usize) {
     println!("contradiction found:");

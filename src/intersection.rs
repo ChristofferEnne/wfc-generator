@@ -78,40 +78,4 @@ impl Intersect for Vec<usize> {
     self.retain(|&x| subset.contains(&x));
     len != self.len() // was the vector was updated
   }
-
-  //fn intersection(self, subset: Vec<usize>) -> Vec<usize> {
-  //  let mut i = 0;
-  //  let mut j = 0;
-  //  let mut v = Vec::new();
-  //  while i < self.len() && j < subset.len() {
-  //    if self[i] != subset[j] {
-  //      if i < j {
-  //        i+=1;
-  //      } else {
-  //        j+=1;
-  //      }
-  //    } else {
-  //      v.push(self[i]);
-  //      i+=1;
-  //      j+=1;
-  //    }
-  //  }
-  //  v
-  //}
-
-  //fn intersection(self, subset: Vec<usize>) -> Vec<usize> {
-  //  let mut i = 0;
-  //  let mut j = 0;
-  //  let mut v = Vec::new();
-  //  while i < self.len() && j < subset.len() {
-  //    if self[i] == subset[j] {
-  //      v.push(self[i]);
-  //    } else if self[i] > subset[j] {
-  //      j+=1;
-  //    } else {
-  //      i+=1;
-  //    }
-  //  }
-  //  v
-  //}
 }

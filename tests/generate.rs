@@ -12,8 +12,8 @@ mod tests {
 
     let mut wfc = WFC::new(
       PatternSetting::PatternBuffer(pattern_test_buffer()),
-      10,
-      10,
+      100,
+      100,
       0
     );
 
@@ -43,7 +43,7 @@ mod tests {
     wfc.generate();
     wfc.draw();
     wfc.export_csv(Path::new("../export.csv").to_path_buf());
-    //wfc.export_bytes(Path::new("../data.map").to_path_buf());
+    wfc.export_bytes(Path::new("../data.csv").to_path_buf());
   }
 
   #[test]
