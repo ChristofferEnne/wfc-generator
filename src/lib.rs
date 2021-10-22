@@ -39,11 +39,13 @@ pub struct WFC {
   base_cell: usize,
   x: usize,
   y: usize,
+  i: usize,
+  j: usize,
   v: usize,
   neihbour_cell: usize,
   selected_pattern: usize,
   stack: Vec<usize>,
-  possible: HashSet<usize>,
+  possible: Vec<usize>,
   rng: StdRng,
 
   min_entropy: Vec<usize>,
@@ -124,7 +126,7 @@ impl WFC {
 
       stack: Vec::with_capacity(height * width),
       keep: Vec::with_capacity(tiles.len()),
-      possible: HashSet::with_capacity(tiles.len()),
+      possible: Vec::with_capacity(tiles.len()),
       rng: StdRng::seed_from_u64(seed),
 
       width,
@@ -136,6 +138,8 @@ impl WFC {
       base_cell: 0,
       x: 0,
       y: 0,
+      i: 0,
+      j: 0,
       v: 0,
       neihbour_cell: 0,
       selected_pattern: 0,
@@ -317,7 +321,7 @@ impl WFC {
             for base_tile in &self.wave[self.base_cell] {
               // for all tiles that can connect to base_tiles
               for pattern in &self.adjancencies[base_tile.clone()][i] {
-                self.possible.insert(pattern.clone());
+                self.possible.push(pattern.clone());
               }
             }
 
@@ -338,11 +342,28 @@ impl WFC {
             // patterns that can be placed at that location and
             // that, "luckily", are available at that same location)
             self.v = self.wave[self.neihbour_cell].len();
-            for entry in &self.wave[self.neihbour_cell] {
-              if self.possible.contains(&entry) {
-                self.keep.push(*entry);
+            //for entry in &self.wave[self.neihbour_cell] {
+            //  if self.possible.contains(&entry) {
+            //    self.keep.push(*entry);
+            //  }
+            //}
+
+            self.i = 0;
+            self.j = 0;
+            self.possible.sort();
+            self.possible.dedup();
+            while self.i < self.wave[self.neihbour_cell].len() && self.j < self.possible.len() {
+              if self.wave[self.neihbour_cell][self.i] == self.possible[self.j] {
+                self.keep.push(self.wave[self.neihbour_cell][self.i]);
+                self.j+=1;
+                self.i+=1;
+              } else if self.wave[self.neihbour_cell][self.i] > self.possible[self.j] {
+                self.j+=1;
+              } else {
+                self.i+=1;
               }
             }
+
             if self.keep.len() < self.v {
               //self.wave[self.neihbour_cell] = std::mem::take(self.keep);
               std::mem::swap(
