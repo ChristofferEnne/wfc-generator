@@ -12,8 +12,8 @@ mod tests {
 
     let mut wfc = WFC::new(
       PatternSetting::PatternBuffer(pattern_test_buffer()),
-      100,
-      100,
+      50,
+      50,
       0
     );
 
