@@ -6,8 +6,8 @@ use rand::{
 use hashbrown::HashSet;
 //use std::collections::HashMap,
 use hashbrown::HashMap;
-use std::{fmt::format, fs::File};
 use std::{ffi::OsStr, io::Write};
+use std::{fmt::format, fs::File};
 
 use std::{fs, path::PathBuf};
 
@@ -47,8 +47,8 @@ pub struct WFC {
   rng: StdRng,
 
   min_entropy: Vec<usize>,
-  
-  keep: Vec<usize>,
+
+  keep: Vec<usize>
 }
 
 impl WFC {
@@ -140,7 +140,7 @@ impl WFC {
       neihbour_cell: 0,
       selected_pattern: 0,
       //rng: rand::thread_rng(),
-      min_entropy: Vec::with_capacity(height * width),
+      min_entropy: Vec::with_capacity(height * width)
     }
   }
 
@@ -337,7 +337,6 @@ impl WFC {
             // —> we look at the intersection of the two sets (all the
             // patterns that can be placed at that location and
             // that, "luckily", are available at that same location)
-            self.keep.clear();
             self.v = self.wave[self.neihbour_cell].len();
             for entry in &self.wave[self.neihbour_cell] {
               if self.possible.contains(&entry) {
@@ -345,9 +344,13 @@ impl WFC {
               }
             }
             if self.keep.len() < self.v {
-               std::mem::swap(&mut self.wave[self.neihbour_cell], &mut self.keep);
+              //self.wave[self.neihbour_cell] = std::mem::take(self.keep);
+              std::mem::swap(
+                &mut self.wave[self.neihbour_cell],
+                &mut self.keep
+              );
 
-            //if self.wave[self.neihbour_cell].intersect(&self.possible) {
+              //if self.wave[self.neihbour_cell].intersect(&self.possible) {
               // If they don't intersect (patterns that could have been placed
               // there but are not available) it means we ran
               // into a "contradiction". We have to stop the whole WFC
@@ -382,6 +385,7 @@ impl WFC {
           } else {
             //println!("does not contain key");
           }
+          self.keep.clear();
         }
       }
       //print!("\x1B[2J");
@@ -451,13 +455,13 @@ impl WFC {
 
   pub fn export_bytes(&self, path: PathBuf) {
     let display = path.display();
-  
+
     // Open a file in write-only mode, returns `io::Result<File>`
     let mut file = match File::create(&path) {
       Err(why) => panic!("couldn't create {}: {}", display, why),
       Ok(file) => file
     };
-  
+
     let mut data1: Vec<String> = Vec::new();
     let mut data2: Vec<String> = Vec::with_capacity(self.cellcount);
     data1.push(format!("row name,cells"));
@@ -471,7 +475,7 @@ impl WFC {
     //for map in &self.wave {
     //  data.push(map.0 as u8);
     //}
-  
+
     match file.write_all(data1.join("\n").as_bytes()) {
       Err(why) => panic!("couldn't write to {}: {}", display, why),
       Ok(_) => println!("successfully wrote to {}", display)
