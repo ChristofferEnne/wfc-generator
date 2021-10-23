@@ -4,6 +4,7 @@ use rand::{
 };
 
 use hashbrown::HashMap;
+use std::thread::yield_now;
 use std::{ffi::OsStr, io::Write};
 use std::fs;
 use std::fs::File;
@@ -39,9 +40,11 @@ pub struct WFC {
   i: usize,
   j: usize,
   v: usize,
+
   neihbour_cell: usize,
   stack: Vec<usize>,
   possible: Vec<usize>,
+
   rng: StdRng,
 
   min_entropy: Vec<usize>,
@@ -174,7 +177,7 @@ impl WFC {
 
       stack: Vec::with_capacity(height * width),
       keep: Vec::with_capacity(tiles.len()),
-      possible: Vec::with_capacity(tiles.len()),
+      possible: Vec::with_capacity(tiles.len()*tiles.len()),
       rng: StdRng::seed_from_u64(seed),
 
       width,
@@ -189,8 +192,8 @@ impl WFC {
       i: 0,
       j: 0,
       v: 0,
+
       neihbour_cell: 0,
-      //rng: rand::thread_rng(),
       min_entropy: Vec::with_capacity(height * width),
     }
   }
@@ -204,10 +207,11 @@ impl WFC {
 
     // Premake a vector with all the tile indexes 
     // that we can clone into wave later
-    self.possible = (0..self.tiles.len()).collect();
-    //for (t, _) in self.tiles.iter().enumerate() {
-    //  self.possible.push(t);
-    //}
+    //self.possible = (0..self.tiles.len()).collect();
+    self.possible.clear();
+    for (t, _) in self.tiles.iter().enumerate() {
+      self.possible.push(t);
+    }
 
     // Clone the premade vector into each cell on wave
     for i in 0..self.cellcount {
@@ -279,131 +283,7 @@ impl WFC {
 
       // The propagation will last as long as that stack is filled with indices
       while !self.stack.is_empty() {
-        // pop() the last index in stack
-        // and get the indices of its 4 neighboring cells (W, N, E, S).
-        // We have to keep them withing bounds and make sure they wrap around.
-        self.base_cell = self.stack.pop().unwrap(); // index of current cell
-
-        self.x = self.base_cell % self.width;
-        self.y = self.base_cell / self.width;
-        for (i, dir) in Direction::iterator().enumerate() {
-          self.neihbour_cell = match dir {
-            Direction::West => {
-              (self.x + self.cellcount - 1) % self.width + self.y * self.width
-            }
-            Direction::North => {
-              self.x
-                + ((self.y + self.cellcount - 1) % self.height) * self.width
-            }
-            Direction::East => {
-              (self.x + self.cellcount + 1) % self.width + self.y * self.width
-            }
-            Direction::South => {
-              self.x
-                + ((self.y + self.cellcount + 1) % self.height) * self.width
-            }
-          };
-
-          // index of negihboring cell
-
-          // We make sure the neighboring cell is not collapsed yet
-          // (we don't want to update a cell that has only 1 pattern available)
-          if self.entropy.contains_key(&self.neihbour_cell) {
-            // Then we check all the patterns that COULD be placed at that
-            // location. So all the patterns that fit with the base
-            // cell.
-
-            //EX: if the neighboring cell is on the left of the current cell
-            // (east side), we look at all the patterns that can be
-            // placed on the left of each pattern contained in the
-            // current cell.
-            self.possible.clear();
-            // for all possible tiles in base_cell
-            for base_tile in &self.wave[self.base_cell] {
-              // for all tiles that can connect to base_tiles
-              for pattern in &self.adjancencies[base_tile.clone()][i] {
-                self.possible.push(pattern.clone());
-              }
-            }
-
-            // We also look at the patterns that ARE available in the
-            // neighboring cell
-
-            // Now we make sure that the neighboring cell really need to be
-            // updated. If all its available patterns are already
-            // in the list of all the possible patterns:
-            // —> there’s no need to update it
-            // (the algorithm skip this neighbor and goes on to the next)
-
-            // there are any patterns from the cell missing in possible
-            // we must update this cell.
-
-            // If it is not a subset of the possible list:
-            // —> we look at the intersection of the two sets (all the
-            // patterns that can be placed at that location and
-            // that, "luckily", are available at that same location)
-            self.v = self.wave[self.neihbour_cell].len();
-
-            self.i = 0;
-            self.j = 0;
-            self.possible.sort();
-            self.possible.dedup();
-            while self.i < self.wave[self.neihbour_cell].len() && self.j < self.possible.len() {
-              if self.wave[self.neihbour_cell][self.i] == self.possible[self.j] {
-                self.keep.push(self.wave[self.neihbour_cell][self.i]);
-                self.j+=1;
-                self.i+=1;
-              } else if self.wave[self.neihbour_cell][self.i] > self.possible[self.j] {
-                self.j+=1;
-              } else {
-                self.i+=1;
-              }
-            }
-
-            if self.keep.len() < self.v {
-              //self.wave[self.neihbour_cell] = std::mem::take(self.keep);
-              std::mem::swap(
-                &mut self.wave[self.neihbour_cell],
-                &mut self.keep
-              );
-
-              //if self.wave[self.neihbour_cell].intersect(&self.possible) {
-              // If they don't intersect (patterns that could have been placed
-              // there but are not available) it means we ran
-              // into a "contradiction". We have to stop the whole WFC
-              // algorithm.
-              if self.wave[self.neihbour_cell].is_empty() {
-                self.print_contradiction(self.base_cell);
-                return false;
-              }
-
-              // If, on the contrary, they do intersect -> we update the
-              // neighboring cell with that refined
-              // list of pattern's indices
-
-              // Because that neighboring cell has been updated, its number of
-              // valid patterns has decreased and its entropy
-              // must be updated accordingly. Note that we're
-              // subtracting a small random value to mix things up: sometimes
-              // cells we'll end-up with the same minimum entropy
-              // value and this prevent to always select the first one of them.
-              // It's a cosmetic trick to break the monotony of the animation
-              self.entropy.insert(
-                self.neihbour_cell,
-                self.wave[self.neihbour_cell].len()
-              );
-
-              // Finally, and most importantly, we add the index of that
-              // neighboring cell to the stack so it becomes the
-              // next current cell in turns (the one whose neighbors will be
-              // updated during the next while loop)
-              self.stack.push(self.neihbour_cell);
-            }
-          } else {
-            //println!("does not contain key");
-          }
-          self.keep.clear();
-        }
+        self.iterate();
       }
       //print!("\x1B[2J");
       //self.draw();
@@ -411,6 +291,135 @@ impl WFC {
     }
     // success
     true
+  }
+
+  fn iterate(&mut self) {
+    // pop() the last index in stack
+    // and get the indices of its 4 neighboring cells (W, N, E, S).
+    // We have to keep them withing bounds and make sure they wrap around.
+    self.base_cell = self.stack.pop().unwrap(); // index of current cell
+
+    self.x = self.base_cell % self.width;
+    self.y = self.base_cell / self.width;
+    for (i, dir) in Direction::iterator().enumerate() {
+      self.neihbour_cell = match dir {
+        Direction::West => {
+          (self.x + self.cellcount - 1) % self.width + self.y * self.width
+        }
+        Direction::North => {
+          self.x
+            + ((self.y + self.cellcount - 1) % self.height) * self.width
+        }
+        Direction::East => {
+          (self.x + self.cellcount + 1) % self.width + self.y * self.width
+        }
+        Direction::South => {
+          self.x
+            + ((self.y + self.cellcount + 1) % self.height) * self.width
+        }
+      };
+
+      // index of negihboring cell
+
+      // We make sure the neighboring cell is not collapsed yet
+      // (we don't want to update a cell that has only 1 pattern available)
+      if self.entropy.contains_key(&self.neihbour_cell) {
+        // Then we check all the patterns that COULD be placed at that
+        // location. So all the patterns that fit with the base
+        // cell.
+
+        //EX: if the neighboring cell is on the left of the current cell
+        // (east side), we look at all the patterns that can be
+        // placed on the left of each pattern contained in the
+        // current cell.
+        self.possible.clear();
+        // for all possible tiles in base_cell
+        for base_tile in &self.wave[self.base_cell] {
+          // for all tiles that can connect to base_tiles
+          for pattern in &self.adjancencies[base_tile.clone()][i] {
+            self.possible.push(pattern.clone());
+          }
+        }
+        //println!("{:?}", self.possible);
+
+        // We also look at the patterns that ARE available in the
+        // neighboring cell
+
+        // Now we make sure that the neighboring cell really need to be
+        // updated. If all its available patterns are already
+        // in the list of all the possible patterns:
+        // —> there’s no need to update it
+        // (the algorithm skip this neighbor and goes on to the next)
+
+        // there are any patterns from the cell missing in possible
+        // we must update this cell.
+
+        // If it is not a subset of the possible list:
+        // —> we look at the intersection of the two sets (all the
+        // patterns that can be placed at that location and
+        // that, "luckily", are available at that same location)
+        self.v = self.wave[self.neihbour_cell].len();
+
+        self.i = 0;
+        self.j = 0;
+        self.possible.sort();
+        self.possible.dedup();
+        while self.i < self.wave[self.neihbour_cell].len() && self.j < self.possible.len() {
+          if self.wave[self.neihbour_cell][self.i] == self.possible[self.j] {
+            self.keep.push(self.wave[self.neihbour_cell][self.i]);
+            self.j+=1;
+            self.i+=1;
+          } else if self.wave[self.neihbour_cell][self.i] > self.possible[self.j] {
+            self.j+=1;
+          } else {
+            self.i+=1;
+          }
+        }
+
+        if self.keep.len() < self.v {
+          //self.wave[self.neihbour_cell] = std::mem::take(self.keep);
+          std::mem::swap(
+            &mut self.wave[self.neihbour_cell],
+            &mut self.keep
+          );
+
+          //if self.wave[self.neihbour_cell].intersect(&self.possible) {
+          // If they don't intersect (patterns that could have been placed
+          // there but are not available) it means we ran
+          // into a "contradiction". We have to stop the whole WFC
+          // algorithm.
+          if self.wave[self.neihbour_cell].is_empty() {
+            self.print_contradiction(self.base_cell);
+            panic!("iteration failed");
+          }
+
+          // If, on the contrary, they do intersect -> we update the
+          // neighboring cell with that refined
+          // list of pattern's indices
+
+          // Because that neighboring cell has been updated, its number of
+          // valid patterns has decreased and its entropy
+          // must be updated accordingly. Note that we're
+          // subtracting a small random value to mix things up: sometimes
+          // cells we'll end-up with the same minimum entropy
+          // value and this prevent to always select the first one of them.
+          // It's a cosmetic trick to break the monotony of the animation
+          self.entropy.insert(
+            self.neihbour_cell,
+            self.wave[self.neihbour_cell].len()
+          );
+
+          // Finally, and most importantly, we add the index of that
+          // neighboring cell to the stack so it becomes the
+          // next current cell in turns (the one whose neighbors will be
+          // updated during the next while loop)
+          self.stack.push(self.neihbour_cell);
+        }
+      } else {
+        //println!("does not contain key");
+      }
+      self.keep.clear();
+    }
   }
 
   //fn pause(&self) {
