@@ -5,12 +5,8 @@ fn main() {
   let iterations = 10;
   let mut successes = 0;
 
-  let mut wfc = WFC::new(
-    PatternSetting::PatternBuffer(Tile::testbuffer()),
-    10,
-    10,
-    0
-  );
+  let mut wfc =
+    WFC::new(PatternSetting::PatternBuffer(Tile::testbuffer()), 10, 10, 0);
 
   for i in 0..iterations {
     wfc.set_seed(i);

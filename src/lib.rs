@@ -1,13 +1,10 @@
-use rand::{
-  prelude::StdRng,
-  Rng, SeedableRng
-};
+use rand::{prelude::StdRng, Rng, SeedableRng};
 
 use hashbrown::HashMap;
-use std::{ffi::OsStr, io::Write};
 use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
+use std::{ffi::OsStr, io::Write};
 
 pub mod dir;
 mod intersection;
@@ -46,7 +43,7 @@ pub struct WFC {
 
   min_entropy: Vec<usize>,
 
-  keep: Vec<usize>,
+  keep: Vec<usize>
 }
 
 impl WFC {
@@ -122,7 +119,8 @@ impl WFC {
     // Array A (for Adjacencies) is an index datastructure that describes the
     // ways that the patterns can be placed near one another. More
     // explanations below
-    let mut adjancencies: Vec<[Vec<usize>; 4]> = Vec::with_capacity(tiles.len());
+    let mut adjancencies: Vec<[Vec<usize>; 4]> =
+      Vec::with_capacity(tiles.len());
     for _ in 0..tiles.len() {
       adjancencies.push([vec![], vec![], vec![], vec![]]);
     }
@@ -191,10 +189,10 @@ impl WFC {
       v: 0,
       neihbour_cell: 0,
       //rng: rand::thread_rng(),
-      min_entropy: Vec::with_capacity(height * width),
+      min_entropy: Vec::with_capacity(height * width)
     }
   }
-    
+
   pub fn generate(&mut self) -> bool {
     // Wave keeps track of all the available patterns, for each
     // cell. At start start, all patterns are valid anywhere in the Wave so
@@ -202,7 +200,7 @@ impl WFC {
     // [cells].[patterns]
     self.wave.clear();
 
-    // Premake a vector with all the tile indexes 
+    // Premake a vector with all the tile indexes
     // that we can clone into wave later
     self.possible = (0..self.tiles.len()).collect();
     //for (t, _) in self.tiles.iter().enumerate() {
@@ -258,14 +256,14 @@ impl WFC {
       // Among the patterns available in the selected cell (the one with min
       // entropy), select one pattern randomly, weighted by the frequency
       // that pattern appears in the input image.
-      self.v = self.wave[self.min_cell].len();
+      self.v = unsafe { self.wave.get_unchecked(self.min_cell) }.len();
       self.v = self.rng.gen_range(0..self.v);
-      self.v = self.wave[self.min_cell][self.v]; // index of selected pattern
-      
+      self.v = unsafe { self.wave.get_unchecked(self.min_cell) }[self.v]; // index of selected pattern
+
       // The Wave's subarray corresponding to the cell with min entropy should
       // now only contains the id of the selected pattern.
-      self.wave[self.min_cell].clear();
-      self.wave[self.min_cell].push(self.v);
+      unsafe { self.wave.get_unchecked_mut(self.min_cell) }.clear();
+      unsafe { self.wave.get_unchecked_mut(self.min_cell) }.push(self.v);
 
       // remove min_cell from entropy to collapse it.
       self.entropy.remove(&self.min_cell);
@@ -319,7 +317,9 @@ impl WFC {
             // current cell.
             self.possible.clear();
             // for all possible tiles in base_cell
-            for base_tile in &self.wave[self.base_cell] {
+            //for base_tile in &self.wave[self.base_cell] {
+            for base_tile in unsafe { self.wave.get_unchecked(self.base_cell) }
+            {
               // for all tiles that can connect to base_tiles
               for pattern in &self.adjancencies[base_tile.clone()][i] {
                 self.possible.push(pattern.clone());
@@ -342,21 +342,37 @@ impl WFC {
             // —> we look at the intersection of the two sets (all the
             // patterns that can be placed at that location and
             // that, "luckily", are available at that same location)
-            self.v = self.wave[self.neihbour_cell].len();
+            self.v =
+              unsafe { self.wave.get_unchecked(self.neihbour_cell) }.len();
 
             self.i = 0;
             self.j = 0;
             self.possible.sort();
             self.possible.dedup();
-            while self.i < self.wave[self.neihbour_cell].len() && self.j < self.possible.len() {
-              if self.wave[self.neihbour_cell][self.i] == self.possible[self.j] {
+            while self.i
+              < unsafe { self.wave.get_unchecked(self.neihbour_cell) }.len()
+              && self.j < self.possible.len()
+            {
+              if unsafe {
+                self
+                  .wave
+                  .get_unchecked(self.neihbour_cell)
+                  .get_unchecked(self.i)
+              } == unsafe { self.possible.get_unchecked(self.j) }
+              {
                 self.keep.push(self.wave[self.neihbour_cell][self.i]);
-                self.j+=1;
-                self.i+=1;
-              } else if self.wave[self.neihbour_cell][self.i] > self.possible[self.j] {
-                self.j+=1;
+                self.j += 1;
+                self.i += 1;
+              } else if unsafe {
+                self
+                  .wave
+                  .get_unchecked(self.neihbour_cell)
+                  .get_unchecked(self.i)
+              } > unsafe { self.possible.get_unchecked(self.j) }
+              {
+                self.j += 1;
               } else {
-                self.i+=1;
+                self.i += 1;
               }
             }
 
@@ -372,7 +388,9 @@ impl WFC {
               // there but are not available) it means we ran
               // into a "contradiction". We have to stop the whole WFC
               // algorithm.
-              if self.wave[self.neihbour_cell].is_empty() {
+              if unsafe { self.wave.get_unchecked(self.neihbour_cell) }
+                .is_empty()
+              {
                 self.print_contradiction(self.base_cell);
                 return false;
               }
@@ -390,7 +408,7 @@ impl WFC {
               // It's a cosmetic trick to break the monotony of the animation
               self.entropy.insert(
                 self.neihbour_cell,
-                self.wave[self.neihbour_cell].len()
+                unsafe { self.wave.get_unchecked(self.neihbour_cell) }.len()
               );
 
               // Finally, and most importantly, we add the index of that
