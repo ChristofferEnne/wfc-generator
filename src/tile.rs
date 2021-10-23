@@ -19,4 +19,97 @@ impl Tile {
       connectors
     }
   }
+
+  pub fn testbuffer() -> Vec<Tile> {
+    vec![
+      Tile::new(
+        " ".to_string(),
+        " ".to_string(),
+        0,
+        (
+          "air".to_string(),
+          "air".to_string(),
+          "air".to_string(),
+          "air".to_string()
+        )
+      ),
+      Tile::new(
+        "└".to_string(),
+        "└".to_string(),
+        0,
+        (
+          "air".to_string(),
+          "rock".to_string(),
+          "rock".to_string(),
+          "air".to_string()
+        )
+      ),
+      Tile::new(
+        "┌".to_string(),
+        "┌".to_string(),
+        1,
+        (
+          "air".to_string(),
+          "air".to_string(),
+          "rock".to_string(),
+          "rock".to_string()
+        )
+      ),
+      Tile::new(
+        "┐".to_string(),
+        "┐".to_string(),
+        2,
+        (
+          "rock".to_string(),
+          "air".to_string(),
+          "air".to_string(),
+          "rock".to_string()
+        )
+      ),
+      Tile::new(
+        "┘".to_string(),
+        "┘".to_string(),
+        3,
+        (
+          "rock".to_string(),
+          "rock".to_string(),
+          "air".to_string(),
+          "air".to_string()
+        )
+      ),
+      Tile::new(
+        "┼".to_string(),
+        "┼".to_string(),
+        0,
+        (
+          "rock".to_string(),
+          "rock".to_string(),
+          "rock".to_string(),
+          "rock".to_string()
+        )
+      ),
+      Tile::new(
+        "─".to_string(),
+        "─".to_string(),
+        0,
+        (
+          "rock".to_string(),
+          "air".to_string(),
+          "rock".to_string(),
+          "air".to_string()
+        )
+      ),
+      Tile::new(
+        "│".to_string(),
+        "│".to_string(),
+        0,
+        (
+          "air".to_string(),
+          "rock".to_string(),
+          "air".to_string(),
+          "rock".to_string()
+        )
+      ),
+    ]
+  }
 }

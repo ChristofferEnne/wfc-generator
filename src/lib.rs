@@ -1,21 +1,18 @@
 use rand::{
-  prelude::{SliceRandom, StdRng, ThreadRng},
+  prelude::StdRng,
   Rng, SeedableRng
 };
-//use std::collections::HashSet;
-use hashbrown::HashSet;
-//use std::collections::HashMap,
+
 use hashbrown::HashMap;
 use std::{ffi::OsStr, io::Write};
-use std::{fmt::format, fs::File};
-
-use std::{fs, path::PathBuf};
+use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
 
 pub mod dir;
 mod intersection;
 pub mod tile;
 use crate::dir::Direction;
-use crate::intersection::Intersect;
 use crate::tile::Tile;
 
 
@@ -43,14 +40,13 @@ pub struct WFC {
   j: usize,
   v: usize,
   neihbour_cell: usize,
-  selected_pattern: usize,
   stack: Vec<usize>,
   possible: Vec<usize>,
   rng: StdRng,
 
   min_entropy: Vec<usize>,
 
-  keep: Vec<usize>
+  keep: Vec<usize>,
 }
 
 impl WFC {
@@ -118,8 +114,60 @@ impl WFC {
       PatternSetting::PatternBuffer(buffer) => buffer
     };
 
+    // Make sure we have some tiles to work with
+    if tiles.is_empty() {
+      panic!("[wfc-generator] tiles is empty.");
+    }
+
+    // Array A (for Adjacencies) is an index datastructure that describes the
+    // ways that the patterns can be placed near one another. More
+    // explanations below
+    let mut adjancencies: Vec<[Vec<usize>; 4]> = Vec::with_capacity(tiles.len());
+    for _ in 0..tiles.len() {
+      adjancencies.push([vec![], vec![], vec![], vec![]]);
+    }
+
+    // Computation of patterns compatibilities (check if some patterns are
+    // adjacent, if so -> store them based on their location)
+
+    // EXAMPLE:
+    //  If pattern index 42 can placed to the right of pattern index 120,
+    //  we will store this adjacency rule as follow:
+    //
+    //  A[120][1].add(42)
+    //
+    //  Here '1' stands for 'right' or 'East'/'E'
+    //
+    //  0 = left or West/W
+    //  1 = right or East/E
+    //  2 = up or North/N
+    //  3 = down or South/S
+
+    // Comparing patterns to each other
+    for index in 0..tiles.len() {
+      //self.i = index;
+      for other_index in 0..tiles.len() {
+        //self.j = other_index;
+        // (in case when N = 3) If the first two columns of pattern 1 == the
+        // last two columns of pattern 2 --> pattern 2 can be placed to
+        // the left (0) of pattern 1
+        if tiles[index].connectors.0 == tiles[other_index].connectors.2 {
+          adjancencies[index][0].push(other_index);
+        }
+        if tiles[index].connectors.1 == tiles[other_index].connectors.3 {
+          adjancencies[index][1].push(other_index);
+        }
+        if tiles[index].connectors.2 == tiles[other_index].connectors.0 {
+          adjancencies[index][2].push(other_index);
+        }
+        if tiles[index].connectors.3 == tiles[other_index].connectors.1 {
+          adjancencies[index][3].push(other_index);
+        }
+      }
+    }
+
     Self {
-      adjancencies: Vec::with_capacity(tiles.len()),
+      adjancencies,
       wave: Vec::with_capacity(height * width),
       entropy: HashMap::with_capacity(height * width),
       cellcount: width * height,
@@ -142,26 +190,31 @@ impl WFC {
       j: 0,
       v: 0,
       neihbour_cell: 0,
-      selected_pattern: 0,
       //rng: rand::thread_rng(),
-      min_entropy: Vec::with_capacity(height * width)
+      min_entropy: Vec::with_capacity(height * width),
     }
   }
-
-  pub fn setup(&mut self) {
+    
+  pub fn generate(&mut self) -> bool {
     // Wave keeps track of all the available patterns, for each
     // cell. At start start, all patterns are valid anywhere in the Wave so
     // each subarray is a list of indices of all the patterns
     // [cells].[patterns]
-    self.wave = Vec::with_capacity(self.cellcount);
+    self.wave.clear();
+
+    // Premake a vector with all the tile indexes 
+    // that we can clone into wave later
+    self.possible = (0..self.tiles.len()).collect();
+    //for (t, _) in self.tiles.iter().enumerate() {
+    //  self.possible.push(t);
+    //}
+
+    // Clone the premade vector into each cell on wave
     for i in 0..self.cellcount {
-      let mut valids = Vec::new();
-      for t in 0..self.tiles.len() {
-        valids.push(t);
-      }
-      //println!("valids: {:?}", valids);
-      self.wave.insert(i, valids);
+      self.wave.insert(i, self.possible.clone());
     }
+    // Clear the premade vector
+    self.possible.clear();
 
     // Entropy should normally be populated with entropy values.
     // Entropy is just a fancy way to represent the number of patterns
@@ -172,60 +225,12 @@ impl WFC {
     // share the same value (npat). We must however pick one cell at random and
     // assign a lower value to it. Why ? Because the algorithm in draw() needs
     // to find a cell with the minimum non-zero entropy value.
-    self.entropy = HashMap::with_capacity(self.cellcount);
+    self.entropy.clear();
+    //self.entropy = vec![self.tiles.len(); self.cellcount];
     for i in 0..self.cellcount {
       self.entropy.insert(i, self.tiles.len());
     }
 
-    // Array A (for Adjacencies) is an index datastructure that describes the
-    // ways that the patterns can be placed near one another. More
-    // explanations below
-    self.adjancencies = Vec::with_capacity(self.tiles.len());
-    for _ in 0..self.tiles.len() {
-      self.adjancencies.push([vec![], vec![], vec![], vec![]]);
-    }
-
-    // Computation of patterns compatibilities (check if some patterns are
-    // adjacent, if so -> store them based on their location)
-
-    // EXAMPLE:
-    //  If pattern index 42 can placed to the right of pattern index 120,
-    //  we will store this adjacency rule as follow:
-    //
-    //  A[120][1].add(42)
-    //
-    //  Here '1' stands for 'right' or 'East'/'E'
-    //
-    //  0 = left or West/W
-    //  1 = right or East/E
-    //  2 = up or North/N
-    //  3 = down or South/S
-
-    // Comparing patterns to each other
-    for key in 0..self.tiles.len() {
-      let selected = &self.tiles[key];
-      for other_index in 0..self.tiles.len() {
-        let other = &self.tiles[other_index];
-        // (in case when N = 3) If the first two columns of pattern 1 == the
-        // last two columns of pattern 2 --> pattern 2 can be placed to
-        // the left (0) of pattern 1
-        if selected.connectors.0 == other.connectors.2 {
-          self.adjancencies[key][0].push(other_index);
-        }
-        if selected.connectors.1 == other.connectors.3 {
-          self.adjancencies[key][1].push(other_index);
-        }
-        if selected.connectors.2 == other.connectors.0 {
-          self.adjancencies[key][2].push(other_index);
-        }
-        if selected.connectors.3 == other.connectors.1 {
-          self.adjancencies[key][3].push(other_index);
-        }
-      }
-    }
-  }
-
-  pub fn generate(&mut self) -> bool {
     // Simple stopping mechanism
     // if entropy list is empty we have collapse all cells
     while !self.entropy.is_empty() {
@@ -255,16 +260,12 @@ impl WFC {
       // that pattern appears in the input image.
       self.v = self.wave[self.min_cell].len();
       self.v = self.rng.gen_range(0..self.v);
-      self.selected_pattern =
-        *self.wave[self.min_cell].iter().collect::<Vec<&usize>>()[self.v]; // index of selected pattern
-
-
-      // // index of selected pattern
-
+      self.v = self.wave[self.min_cell][self.v]; // index of selected pattern
+      
       // The Wave's subarray corresponding to the cell with min entropy should
-      // now only contains the id of the selected pattern
-      self.wave[self.min_cell] =
-        vec![self.selected_pattern].into_iter().collect();
+      // now only contains the id of the selected pattern.
+      self.wave[self.min_cell].clear();
+      self.wave[self.min_cell].push(self.v);
 
       // remove min_cell from entropy to collapse it.
       self.entropy.remove(&self.min_cell);
@@ -342,11 +343,6 @@ impl WFC {
             // patterns that can be placed at that location and
             // that, "luckily", are available at that same location)
             self.v = self.wave[self.neihbour_cell].len();
-            //for entry in &self.wave[self.neihbour_cell] {
-            //  if self.possible.contains(&entry) {
-            //    self.keep.push(*entry);
-            //  }
-            //}
 
             self.i = 0;
             self.j = 0;
