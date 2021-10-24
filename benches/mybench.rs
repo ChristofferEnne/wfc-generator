@@ -1,13 +1,17 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use wfc_generator::tile::Tile;
+use wfc_generator::tileloader::{TestLoader, TileLoader};
 use wfc_generator::{PatternSetting, WFC};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
   let mut group = c.benchmark_group("generation");
+
+  
+
   group.bench_function("complete", |b| {
     b.iter(|| {
       let mut wfc = WFC::new(
-        PatternSetting::PatternBuffer(Tile::testbuffer()),
+        TestLoader::new().load(),
         50,
         50,
         0
@@ -19,7 +23,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
   group.bench_function("preallocation", |b| {
     let mut wfc = WFC::new(
-      PatternSetting::PatternBuffer(Tile::testbuffer()),
+      TestLoader::new().load(),
       50,
       50,
       0
@@ -30,7 +34,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
   });
 
   let mut wfc = WFC::new(
-    PatternSetting::PatternBuffer(Tile::testbuffer()),
+    TestLoader::new().load(),
     50,
     50,
     0

@@ -13,6 +13,7 @@ use std::path::PathBuf;
 pub mod dir;
 mod intersection;
 pub mod tile;
+pub mod tileloader;
 use crate::dir::Direction;
 use crate::tile::Tile;
 
@@ -54,71 +55,11 @@ pub struct WFC {
 
 impl WFC {
   pub fn new(
-    pattern_setting: PatternSetting,
+    tiles: Vec<Tile>,
     width: usize,
     height: usize,
     seed: u64
   ) -> Self {
-    let tiles = match pattern_setting {
-      PatternSetting::FromDirectory(path) => {
-        // Get a iterator over the directory
-        let dir_iter = match fs::read_dir(path) {
-          Ok(iter) => iter,
-          Err(e) => panic!("{}", e)
-        };
-
-        // Create the tiles vector
-        //let mut tiles: Vec<Tile> =
-        // Vec::with_capacity(dir_iter.count().clone());
-        let mut tiles: Vec<Tile> = Vec::new();
-
-        // Iterating through the directory of tile models
-        let mut id = 0;
-        for entry in dir_iter {
-          let entry = entry.unwrap();
-
-          // skip file if its not a fbx file
-          if entry.path().extension() != Some(&OsStr::new("fbx")) {
-            continue;
-          }
-
-          // appending tile to 'tiles' array list
-          // file naming convention: name_left_back_right_front_turns.fbx
-          if let Some(filename) = entry.path().file_stem() {
-            let name: Vec<&str> =
-              filename.to_str().unwrap().split('_').collect();
-
-            // rotate by 90° the number of times specified in tile name
-            // cycles the connectors around (index 1-4)
-            let rotations = name[5].parse::<usize>().unwrap();
-            for rot in 0..rotations + 1 {
-              tiles.push(Tile::new(
-                id,
-                format!("{}_{}", name[0].to_string(), tiles.len().to_string()),
-                entry
-                .path()
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
-                rot,
-                (
-                  name[(rot + 0) % 4 + 1].parse::<u8>().unwrap(),
-                  name[(rot + 1) % 4 + 1].parse::<u8>().unwrap(),
-                  name[(rot + 2) % 4 + 1].parse::<u8>().unwrap(),
-                  name[(rot + 3) % 4 + 1].parse::<u8>().unwrap()
-                )
-              ));
-            }
-          };
-          id += 1;
-        }
-        tiles
-      }
-      PatternSetting::PatternBuffer(buffer) => buffer
-    };
-
     // Make sure we have some tiles to work with
     if tiles.is_empty() {
       panic!("[wfc-generator] tiles is empty.");
@@ -476,18 +417,22 @@ impl WFC {
 
     // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
     let mut data = Vec::new();
-    data.push(format!("row name,id,filename,rotation,connectors"));
+    data.push(format!("row name,id,filename,rotation,connectors,flip"));
     for tile in &self.tiles {
       data.push(format!(
-        r#"{},{},{},{},"{},{},{},{}""#,
+        r#"{},{},{},{},"{},{},{},{}","{},{},{},{}""#,
         tile.name,
         tile.id,
         tile.filename,
         tile.rotation,
-        tile.connectors.0,
-        tile.connectors.1,
-        tile.connectors.2,
-        tile.connectors.3
+        tile.connectors.0.0,
+        tile.connectors.1.0,
+        tile.connectors.2.0,
+        tile.connectors.3.0,
+        tile.connectors.0.1,
+        tile.connectors.1.1,
+        tile.connectors.2.1,
+        tile.connectors.3.1
       ));
     }
 

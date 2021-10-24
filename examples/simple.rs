@@ -1,4 +1,5 @@
 use wfc_generator::tile::Tile;
+use wfc_generator::tileloader::{TestLoader, TileLoader};
 use wfc_generator::{PatternSetting, WFC};
 
 fn main() {
@@ -6,7 +7,7 @@ fn main() {
   let mut successes = 0;
 
   let mut wfc = WFC::new(
-    PatternSetting::PatternBuffer(Tile::testbuffer()),
+    TestLoader::new().load(),
     10,
     10,
     0

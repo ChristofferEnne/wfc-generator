@@ -3,6 +3,7 @@ mod tests {
   use std::path::{Path, PathBuf};
 
   use wfc_generator::tile::Tile;
+  use wfc_generator::tileloader::{DirectoryLoader, TestLoader, TileLoader};
   use wfc_generator::{PatternSetting, WFC};
 
   #[test]
@@ -10,8 +11,9 @@ mod tests {
     let iterations = 10;
     let mut successes = 0;
 
+    let tiles = TestLoader::new().load();
     let mut wfc = WFC::new(
-      PatternSetting::PatternBuffer(Tile::testbuffer()),
+      tiles,
       50,
       50,
       0
@@ -29,10 +31,11 @@ mod tests {
 
   #[test]
   fn from_directory() {
-    let mut wfc = WFC::new(
-      PatternSetting::FromDirectory(PathBuf::from(
+    let tiles = DirectoryLoader::new(PathBuf::from(
         r"D:\qrnch Dropbox\Christoffer Enne\wfcproject\Content\Tiles\"
-      )),
+      )).load();
+    let mut wfc = WFC::new(
+      tiles,
       10,
       10,
       0
