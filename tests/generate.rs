@@ -31,7 +31,7 @@ mod tests {
   fn from_directory() {
     let mut wfc = WFC::new(
       PatternSetting::FromDirectory(PathBuf::from(
-        r"D:\qrnch Dropbox\Christoffer Enne\IslandDemo\Content\Models\Tiles\"
+        r"D:\qrnch Dropbox\Christoffer Enne\wfcproject\Content\Tiles\"
       )),
       10,
       10,
@@ -39,8 +39,8 @@ mod tests {
     );
 
     wfc.generate();
-    wfc.draw();
+    wfc.draw_data();
     wfc.export_csv(Path::new("../export.csv").to_path_buf());
-    wfc.export_bytes(Path::new("../data.csv").to_path_buf());
+    wfc.export_bytes(Path::new("../data.wfc").to_path_buf());
   }
 }

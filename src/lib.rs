@@ -73,12 +73,12 @@ impl WFC {
         let mut tiles: Vec<Tile> = Vec::new();
 
         // Iterating through the directory of tile models
+        let mut id = 0;
         for entry in dir_iter {
           let entry = entry.unwrap();
 
           // skip file if its not a fbx file
           if entry.path().extension() != Some(&OsStr::new("fbx")) {
-            println!("file.");
             continue;
           }
 
@@ -93,24 +93,26 @@ impl WFC {
             let rotations = name[5].parse::<usize>().unwrap();
             for rot in 0..rotations + 1 {
               tiles.push(Tile::new(
+                id,
                 format!("{}_{}", name[0].to_string(), tiles.len().to_string()),
                 entry
-                  .path()
-                  .file_name()
-                  .unwrap()
-                  .to_str()
-                  .unwrap()
-                  .to_string(),
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
                 rot,
                 (
-                  name[(rot + 0) % 4 + 1].to_string(),
-                  name[(rot + 1) % 4 + 1].to_string(),
-                  name[(rot + 2) % 4 + 1].to_string(),
-                  name[(rot + 3) % 4 + 1].to_string()
+                  name[(rot + 0) % 4 + 1].parse::<u8>().unwrap(),
+                  name[(rot + 1) % 4 + 1].parse::<u8>().unwrap(),
+                  name[(rot + 2) % 4 + 1].parse::<u8>().unwrap(),
+                  name[(rot + 3) % 4 + 1].parse::<u8>().unwrap()
                 )
               ));
             }
           };
+          id += 1;
         }
         tiles
       }
@@ -448,6 +450,21 @@ impl WFC {
     }
   }
 
+  pub fn draw_data(&self) {
+    println!("");
+    for y in 0..self.height {
+      for x in 0..self.width {
+        if self.wave[(x + (y * self.width))].len() > 1 {
+          print!("#,");
+        } else {
+          let t = self.wave[(x + (y * self.width))].iter().next().unwrap();
+          print!("{},", t);
+        }
+      }
+      println!("");
+    }
+  }
+
   pub fn export_csv(&self, path: PathBuf) {
     let display = path.display();
 
@@ -459,11 +476,12 @@ impl WFC {
 
     // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
     let mut data = Vec::new();
-    data.push(format!("row name,filename,rotation,connectors"));
+    data.push(format!("row name,id,filename,rotation,connectors"));
     for tile in &self.tiles {
       data.push(format!(
-        r#"{},{},{},"{},{},{},{}""#,
+        r#"{},{},{},{},"{},{},{},{}""#,
         tile.name,
+        tile.id,
         tile.filename,
         tile.rotation,
         tile.connectors.0,
@@ -488,21 +506,13 @@ impl WFC {
       Ok(file) => file
     };
 
-    let mut data1: Vec<String> = Vec::new();
-    let mut data2: Vec<String> = Vec::with_capacity(self.cellcount);
-    data1.push(format!("row name,cells"));
-    for cell in &self.wave {
-      data2.push(cell[0].to_string());
-    }
-    data1.push(format!(r#"data,"{}""#, data2.join(",")));
-
     //// Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
-    //let mut data: Vec<u8> = Vec::with_capacity(self.cellcount);
-    //for map in &self.wave {
-    //  data.push(map.0 as u8);
-    //}
+    let mut data: Vec<u8> = Vec::with_capacity(self.cellcount);
+    for map in &self.wave {
+      data.push(map[0] as u8);
+    }
 
-    match file.write_all(data1.join("\n").as_bytes()) {
+    match file.write_all(&data) {
       Err(why) => panic!("couldn't write to {}: {}", display, why),
       Ok(_) => println!("successfully wrote to {}", display)
     }
