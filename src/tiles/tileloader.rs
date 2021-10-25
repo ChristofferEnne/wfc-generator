@@ -300,7 +300,7 @@ impl TileLoader for DirectoryLoader {
     };
     
     // Create the tiles vector
-    let mut tiles: Vec<Tile> = Vec::new();
+    self.tiles = Vec::new();
 
     // Iterating through the directory of tile models
     let mut id = 0;
@@ -345,9 +345,9 @@ impl TileLoader for DirectoryLoader {
             (rot + 3) % 4
           ];
 
-          tiles.push(Tile::new(
+          self.tiles.push(Tile::new(
             id,
-            format!("{}_{}", name[0].to_string(), tiles.len().to_string()),
+            format!("{}_{}", name[0].to_string(), self.tiles.len().to_string()),
             entry
             .path()
             .file_name()

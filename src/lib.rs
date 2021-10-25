@@ -383,7 +383,7 @@ impl WFC {
     println!("contradiction found:");
     let x = index % self.width;
     let y = index / self.width;
-    println!("x{} y{}", x, y);
+    println!("x:{} y:{}", x, y);
     for dir in Direction::iterator() {
       let (nx, ny) = match dir {
         Direction::West => ((x + self.cellcount - 1) % self.width, y),
@@ -391,9 +391,15 @@ impl WFC {
         Direction::East => ((x + self.cellcount + 1) % self.width, y),
         Direction::South => (x, (y + self.cellcount + 1) % self.width)
       };
-      println!("nx{} ny{}", nx, ny);
-      println!("{} - {:?}", (nx + (ny * self.width)), self.wave.len());
-      println!("{} - {:?}", dir, self.wave[(nx + ny * self.width)]);
+      println!("nx:{} ny:{}", nx, ny);
+      
+      let pattern = &self.wave[(nx + ny * self.width)];
+      match dir {
+        Direction::West => {println!("West: {:?}", pattern);},
+        Direction::North => {println!("North: {:?}", pattern);},
+        Direction::East => {println!("East: {:?}", pattern);},
+        Direction::South => {println!("South: {:?}", pattern);},
+      }
     }
   }
 }
