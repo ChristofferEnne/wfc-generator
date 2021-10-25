@@ -12,10 +12,9 @@ use std::path::PathBuf;
 
 pub mod dir;
 mod intersection;
-pub mod tile;
-pub mod tileloader;
-use crate::dir::Direction;
-use crate::tile::Tile;
+pub mod tiles;
+use dir::Direction;
+use tiles::tile::Tile;
 
 
 pub enum PatternSetting {
@@ -25,10 +24,10 @@ pub enum PatternSetting {
 
 #[derive()]
 pub struct WFC {
-  tiles: Vec<Tile>,
+  linking: Vec<[Vec<usize>; 4]>,
+  patterncount: usize,
   wave: Vec<Vec<usize>>,
   entropy: HashMap<usize, usize>,
-  adjancencies: Vec<[Vec<usize>; 4]>,
   width: usize,
   height: usize,
   cellcount: usize,
@@ -55,77 +54,30 @@ pub struct WFC {
 
 impl WFC {
   pub fn new(
-    tiles: Vec<Tile>,
+    linking: Vec<[Vec<usize>; 4]>,
     width: usize,
     height: usize,
     seed: u64
   ) -> Self {
     // Make sure we have some tiles to work with
-    if tiles.is_empty() {
+    if linking.is_empty() {
       panic!("[wfc-generator] tiles is empty.");
     }
 
-    // Array A (for Adjacencies) is an index datastructure that describes the
-    // ways that the patterns can be placed near one another. More
-    // explanations below
-    let mut adjancencies: Vec<[Vec<usize>; 4]> = Vec::with_capacity(tiles.len());
-    for _ in 0..tiles.len() {
-      adjancencies.push([vec![], vec![], vec![], vec![]]);
-    }
-
-    // Computation of patterns compatibilities (check if some patterns are
-    // adjacent, if so -> store them based on their location)
-
-    // EXAMPLE:
-    //  If pattern index 42 can placed to the right of pattern index 120,
-    //  we will store this adjacency rule as follow:
-    //
-    //  A[120][1].add(42)
-    //
-    //  Here '1' stands for 'right' or 'East'/'E'
-    //
-    //  0 = left or West/W
-    //  1 = right or East/E
-    //  2 = up or North/N
-    //  3 = down or South/S
-
-    // Comparing patterns to each other
-    for index in 0..tiles.len() {
-      //self.i = index;
-      for other_index in 0..tiles.len() {
-        //self.j = other_index;
-        // (in case when N = 3) If the first two columns of pattern 1 == the
-        // last two columns of pattern 2 --> pattern 2 can be placed to
-        // the left (0) of pattern 1
-        if tiles[index].connectors.0 == tiles[other_index].connectors.2 {
-          adjancencies[index][0].push(other_index);
-        }
-        if tiles[index].connectors.1 == tiles[other_index].connectors.3 {
-          adjancencies[index][1].push(other_index);
-        }
-        if tiles[index].connectors.2 == tiles[other_index].connectors.0 {
-          adjancencies[index][2].push(other_index);
-        }
-        if tiles[index].connectors.3 == tiles[other_index].connectors.1 {
-          adjancencies[index][3].push(other_index);
-        }
-      }
-    }
-
     Self {
-      adjancencies,
+      patterncount: linking.len(),
       wave: Vec::with_capacity(height * width),
       entropy: HashMap::with_capacity(height * width),
       cellcount: width * height,
 
       stack: Vec::with_capacity(height * width),
-      keep: Vec::with_capacity(tiles.len()),
-      possible: Vec::with_capacity(tiles.len()*tiles.len()),
+      keep: Vec::with_capacity(linking.len()),
+      possible: Vec::with_capacity(linking.len()*linking.len()),
       rng: StdRng::seed_from_u64(seed),
 
+      linking,
       width,
       height,
-      tiles,
       seed,
 
       min_cell: 0,
@@ -152,7 +104,7 @@ impl WFC {
     // that we can clone into wave later
     //self.possible = (0..self.tiles.len()).collect();
     self.possible.clear();
-    for (t, _) in self.tiles.iter().enumerate() {
+    for t in 0..self.patterncount {
       self.possible.push(t);
     }
 
@@ -175,7 +127,7 @@ impl WFC {
     self.entropy.clear();
     //self.entropy = vec![self.tiles.len(); self.cellcount];
     for i in 0..self.cellcount {
-      self.entropy.insert(i, self.tiles.len());
+      self.entropy.insert(i, self.patterncount);
     }
 
     // Simple stopping mechanism
@@ -279,7 +231,7 @@ impl WFC {
         // for all possible tiles in base_cell
         for base_tile in &self.wave[self.base_cell] {
           // for all tiles that can connect to base_tiles
-          for pattern in &self.adjancencies[base_tile.clone()][i] {
+          for pattern in &self.linking[base_tile.clone()][i] {
             self.possible.push(pattern.clone());
           }
         }
@@ -376,7 +328,7 @@ impl WFC {
     self.seed = seed;
   }
 
-  pub fn draw(&self) {
+  pub fn draw(&self, tiles: &Vec<Tile>) {
     println!("");
     for y in 0..self.height {
       for x in 0..self.width {
@@ -384,7 +336,7 @@ impl WFC {
           print!("{}", self.wave[(x + (y * self.width))].len());
         } else {
           let t = self.wave[(x + (y * self.width))].iter().next().unwrap();
-          print!("{}", self.tiles[*t].filename);
+          print!("{}", tiles[*t].filename);
         }
       }
       println!("");
@@ -406,43 +358,7 @@ impl WFC {
     }
   }
 
-  pub fn export_csv(&self, path: PathBuf) {
-    let display = path.display();
-
-    // Open a file in write-only mode, returns `io::Result<File>`
-    let mut file = match File::create(&path) {
-      Err(why) => panic!("couldn't create {}: {}", display, why),
-      Ok(file) => file
-    };
-
-    // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
-    let mut data = Vec::new();
-    data.push(format!("row name,id,filename,rotation,connectors,flip"));
-    for tile in &self.tiles {
-      data.push(format!(
-        r#"{},{},{},{},"{},{},{},{}","{},{},{},{}""#,
-        tile.name,
-        tile.id,
-        tile.filename,
-        tile.rotation,
-        tile.connectors.0.0,
-        tile.connectors.1.0,
-        tile.connectors.2.0,
-        tile.connectors.3.0,
-        tile.connectors.0.1,
-        tile.connectors.1.1,
-        tile.connectors.2.1,
-        tile.connectors.3.1
-      ));
-    }
-
-    match file.write_all(data.join("\n").as_bytes()) {
-      Err(why) => panic!("couldn't write to {}: {}", display, why),
-      Ok(_) => println!("successfully wrote to {}", display)
-    }
-  }
-
-  pub fn export_bytes(&self, path: PathBuf) {
+  pub fn export(&self, path: PathBuf) {
     let display = path.display();
 
     // Open a file in write-only mode, returns `io::Result<File>`

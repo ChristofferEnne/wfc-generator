@@ -1,13 +1,13 @@
-use wfc_generator::tile::Tile;
-use wfc_generator::tileloader::{TestLoader, TileLoader};
+use wfc_generator::tiles::tile::Tile;
+use wfc_generator::tiles::tileloader::{TestLoader, TileLoader};
 use wfc_generator::{PatternSetting, WFC};
 
 fn main() {
   let iterations = 10;
   let mut successes = 0;
-
+  let mut tileloader = TestLoader::new();
   let mut wfc = WFC::new(
-    TestLoader::new().load(),
+    tileloader.load(),
     10,
     10,
     0
@@ -19,7 +19,7 @@ fn main() {
       successes += 1;
     }
   }
-  wfc.draw();
+  wfc.draw(tileloader.tiles());
   assert_eq!(successes, iterations);
 }
 
