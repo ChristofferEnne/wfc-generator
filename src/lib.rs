@@ -199,18 +199,16 @@ impl WFC {
     for (i, dir) in Direction::iterator().enumerate() {
       self.neihbour_cell = match dir {
         Direction::West => {
-          (self.x + self.cellcount - 1) % self.width + self.y * self.width
+          self.coord_index(self.x + self.cellcount - 1, self.y,0)
         }
         Direction::North => {
-          self.x
-            + ((self.y + self.cellcount - 1) % self.height) * self.width
+          self.coord_index(self.x, self.y + self.cellcount - 1,0)
         }
         Direction::East => {
-          (self.x + self.cellcount + 1) % self.width + self.y * self.width
+          self.coord_index(self.x + self.cellcount + 1, self.y,0)
         }
         Direction::South => {
-          self.x
-            + ((self.y + self.cellcount + 1) % self.height) * self.width
+          self.coord_index(self.x, self.y + self.cellcount + 1,0)
         }
       };
 
@@ -402,4 +400,22 @@ impl WFC {
       }
     }
   }
+
+  fn index_x(&self, index: usize) -> usize {
+    (index % self.width) % self.cellcount
+  }
+
+  fn index_y(&self, index: usize) -> usize {
+    ((index / self.width) % self.height) % self.cellcount
+  }
+
+  fn index_z(&self, index: usize) -> usize {
+    (index / (self.width * self.height)) % self.cellcount
+  }
+
+  fn coord_index(&self, x: usize, y: usize, z: usize) -> usize {
+    (x + self.width * y + self.width * self.height * z) % self.cellcount
+  }
 }
+
+
