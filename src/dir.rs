@@ -3,16 +3,20 @@ pub enum Direction {
   West,
   North,
   East,
-  South
+  South,
+  Up,
+  Down
 }
 
 impl Direction {
   pub fn iterator() -> Iter<'static, Direction> {
-    static DIRECTIONS: [Direction; 4] = [
+    static DIRECTIONS: [Direction; 6] = [
       Direction::West,
       Direction::North,
       Direction::East,
-      Direction::South
+      Direction::South,
+      Direction::Up,
+      Direction::Down
     ];
     DIRECTIONS.iter()
   }

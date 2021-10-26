@@ -1,14 +1,11 @@
-use rand::{
-  prelude::StdRng,
-  Rng, SeedableRng
-};
+use rand::{prelude::StdRng, Rng, SeedableRng};
 
 use hashbrown::HashMap;
-use std::thread::yield_now;
-use std::{ffi::OsStr, io::Write};
 use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
+use std::thread::yield_now;
+use std::{ffi::OsStr, io::Write};
 
 pub mod dir;
 mod intersection;
@@ -16,6 +13,13 @@ pub mod tiles;
 use dir::Direction;
 use tiles::tile::Tile;
 
+/// Front facing
+///
+/// Z height
+/// │
+/// │   Y depth
+/// │ /
+/// └─────── X width
 
 pub enum PatternSetting {
   FromDirectory(PathBuf),
@@ -24,12 +28,15 @@ pub enum PatternSetting {
 
 #[derive()]
 pub struct WFC {
-  linking: Vec<[Vec<usize>; 4]>,
+  linking: Vec<[Vec<usize>; 6]>,
   patterncount: usize,
   wave: Vec<Vec<usize>>,
   entropy: HashMap<usize, usize>,
+
   width: usize,
+  depth: usize,
   height: usize,
+
   cellcount: usize,
   seed: u64,
 
@@ -37,6 +44,7 @@ pub struct WFC {
   base_cell: usize,
   x: usize,
   y: usize,
+  z: usize,
   i: usize,
   j: usize,
   v: usize,
@@ -49,13 +57,14 @@ pub struct WFC {
 
   min_entropy: Vec<usize>,
 
-  keep: Vec<usize>,
+  keep: Vec<usize>
 }
 
 impl WFC {
   pub fn new(
-    linking: Vec<[Vec<usize>; 4]>,
+    linking: Vec<[Vec<usize>; 6]>,
     width: usize,
+    depth: usize,
     height: usize,
     seed: u64
   ) -> Self {
@@ -66,33 +75,37 @@ impl WFC {
 
     Self {
       patterncount: linking.len(),
-      wave: Vec::with_capacity(height * width),
-      entropy: HashMap::with_capacity(height * width),
-      cellcount: width * height,
+      wave: Vec::with_capacity(depth * width * height),
+      entropy: HashMap::with_capacity(depth * width * height),
+      cellcount: width * depth * height,
 
-      stack: Vec::with_capacity(height * width),
+      stack: Vec::with_capacity(depth * width * height),
       keep: Vec::with_capacity(linking.len()),
-      possible: Vec::with_capacity(linking.len()*linking.len()),
+      possible: Vec::with_capacity(linking.len() * linking.len()),
       rng: StdRng::seed_from_u64(seed),
 
       linking,
       width,
+      depth,
       height,
       seed,
 
       min_cell: 0,
       base_cell: 0,
+
       x: 0,
       y: 0,
+      z: 0,
+
       i: 0,
       j: 0,
       v: 0,
 
       neihbour_cell: 0,
-      min_entropy: Vec::with_capacity(height * width),
+      min_entropy: Vec::with_capacity(depth * width * height)
     }
   }
-    
+
   pub fn generate(&mut self) -> bool {
     // Wave keeps track of all the available patterns, for each
     // cell. At start start, all patterns are valid anywhere in the Wave so
@@ -100,7 +113,7 @@ impl WFC {
     // [cells].[patterns]
     self.wave.clear();
 
-    // Premake a vector with all the tile indexes 
+    // Premake a vector with all the tile indexes
     // that we can clone into wave later
     //self.possible = (0..self.tiles.len()).collect();
     self.possible.clear();
@@ -160,7 +173,7 @@ impl WFC {
       self.v = self.wave[self.min_cell].len();
       self.v = self.rng.gen_range(0..self.v);
       self.v = self.wave[self.min_cell][self.v]; // index of selected pattern
-      
+
       // The Wave's subarray corresponding to the cell with min entropy should
       // now only contains the id of the selected pattern.
       self.wave[self.min_cell].clear();
@@ -194,21 +207,28 @@ impl WFC {
     // We have to keep them withing bounds and make sure they wrap around.
     self.base_cell = self.stack.pop().unwrap(); // index of current cell
 
-    self.x = self.base_cell % self.width;
-    self.y = self.base_cell / self.width;
+    self.x = self.index_x(self.base_cell);
+    self.y = self.index_y(self.base_cell);
+    self.z = self.index_z(self.base_cell);
     for (i, dir) in Direction::iterator().enumerate() {
       self.neihbour_cell = match dir {
         Direction::West => {
-          self.coord_index(self.x + self.cellcount - 1, self.y,0)
+          self.coord_index(self.x + self.cellcount - 1, self.y, self.z)
         }
         Direction::North => {
-          self.coord_index(self.x, self.y + self.cellcount - 1,0)
+          self.coord_index(self.x, self.y + self.cellcount - 1, self.z)
         }
         Direction::East => {
-          self.coord_index(self.x + self.cellcount + 1, self.y,0)
+          self.coord_index(self.x + self.cellcount + 1, self.y, self.z)
         }
         Direction::South => {
-          self.coord_index(self.x, self.y + self.cellcount + 1,0)
+          self.coord_index(self.x, self.y + self.cellcount + 1, self.z)
+        }
+        Direction::Up => {
+          self.coord_index(self.x, self.y, self.z + self.cellcount + 1)
+        }
+        Direction::Down => {
+          self.coord_index(self.x, self.y, self.z + self.cellcount - 1)
         }
       };
 
@@ -257,24 +277,25 @@ impl WFC {
         self.j = 0;
         self.possible.sort();
         self.possible.dedup();
-        while self.i < self.wave[self.neihbour_cell].len() && self.j < self.possible.len() {
+        while self.i < self.wave[self.neihbour_cell].len()
+          && self.j < self.possible.len()
+        {
           if self.wave[self.neihbour_cell][self.i] == self.possible[self.j] {
             self.keep.push(self.wave[self.neihbour_cell][self.i]);
-            self.j+=1;
-            self.i+=1;
-          } else if self.wave[self.neihbour_cell][self.i] > self.possible[self.j] {
-            self.j+=1;
+            self.j += 1;
+            self.i += 1;
+          } else if self.wave[self.neihbour_cell][self.i]
+            > self.possible[self.j]
+          {
+            self.j += 1;
           } else {
-            self.i+=1;
+            self.i += 1;
           }
         }
 
         if self.keep.len() < self.v {
           //self.wave[self.neihbour_cell] = std::mem::take(self.keep);
-          std::mem::swap(
-            &mut self.wave[self.neihbour_cell],
-            &mut self.keep
-          );
+          std::mem::swap(&mut self.wave[self.neihbour_cell], &mut self.keep);
 
           //if self.wave[self.neihbour_cell].intersect(&self.possible) {
           // If they don't intersect (patterns that could have been placed
@@ -282,7 +303,7 @@ impl WFC {
           // into a "contradiction". We have to stop the whole WFC
           // algorithm.
           if self.wave[self.neihbour_cell].is_empty() {
-            self.print_contradiction(self.base_cell);
+            self.print_contradiction(self.neihbour_cell);
             panic!("iteration failed");
           }
 
@@ -297,10 +318,9 @@ impl WFC {
           // cells we'll end-up with the same minimum entropy
           // value and this prevent to always select the first one of them.
           // It's a cosmetic trick to break the monotony of the animation
-          self.entropy.insert(
-            self.neihbour_cell,
-            self.wave[self.neihbour_cell].len()
-          );
+          self
+            .entropy
+            .insert(self.neihbour_cell, self.wave[self.neihbour_cell].len());
 
           // Finally, and most importantly, we add the index of that
           // neighboring cell to the stack so it becomes the
@@ -328,7 +348,7 @@ impl WFC {
 
   pub fn draw(&self, tiles: &Vec<Tile>) {
     println!("");
-    for y in 0..self.height {
+    for y in 0..self.depth {
       for x in 0..self.width {
         if self.wave[(x + (y * self.width))].len() > 1 {
           print!("{}", self.wave[(x + (y * self.width))].len());
@@ -343,7 +363,7 @@ impl WFC {
 
   pub fn draw_data(&self) {
     println!("");
-    for y in 0..self.height {
+    for y in 0..self.depth {
       for x in 0..self.width {
         if self.wave[(x + (y * self.width))].len() > 1 {
           print!("#,");
@@ -379,24 +399,41 @@ impl WFC {
 
   fn print_contradiction(&self, index: usize) {
     println!("contradiction found:");
-    let x = index % self.width;
-    let y = index / self.width;
-    println!("x:{} y:{}", x, y);
+    let x = self.index_x(index);
+    let y = self.index_y(index);
+    let z = self.index_z(index);
+    println!("x:{} y:{} z:{}", x, y, z);
     for dir in Direction::iterator() {
-      let (nx, ny) = match dir {
-        Direction::West => ((x + self.cellcount - 1) % self.width, y),
-        Direction::North => (x, (y + self.cellcount - 1) % self.width),
-        Direction::East => ((x + self.cellcount + 1) % self.width, y),
-        Direction::South => (x, (y + self.cellcount + 1) % self.width)
+      let (nx, ny, nz) = match dir {
+        Direction::West => (self.index_x(x + self.cellcount - 1), y, z),
+        Direction::North => (x, self.index_y(y + self.cellcount - 1), z),
+        Direction::East => (self.index_x(x + self.cellcount + 1), y, z),
+        Direction::South => (x, self.index_y(y + self.cellcount + 1), z),
+        Direction::Up => (x, y, self.index_z(z + self.cellcount + 1)),
+        Direction::Down => (x, y, self.index_z(z + self.cellcount - 1))
       };
-      println!("nx:{} ny:{}", nx, ny);
-      
-      let pattern = &self.wave[(nx + ny * self.width)];
+      println!("nx:{} ny:{} nz:{}", nx, ny, nz);
+
+      let pattern = &self.wave[self.coord_index(nx, ny, nz)];
       match dir {
-        Direction::West => {println!("West: {:?}", pattern);},
-        Direction::North => {println!("North: {:?}", pattern);},
-        Direction::East => {println!("East: {:?}", pattern);},
-        Direction::South => {println!("South: {:?}", pattern);},
+        Direction::West => {
+          println!("West: {:?}", pattern);
+        }
+        Direction::North => {
+          println!("North: {:?}", pattern);
+        }
+        Direction::East => {
+          println!("East: {:?}", pattern);
+        }
+        Direction::South => {
+          println!("South: {:?}", pattern);
+        }
+        Direction::Up => {
+          println!("Up: {:?}", pattern);
+        }
+        Direction::Down => {
+          println!("Down: {:?}", pattern);
+        }
       }
     }
   }
@@ -406,16 +443,14 @@ impl WFC {
   }
 
   fn index_y(&self, index: usize) -> usize {
-    ((index / self.width) % self.height) % self.cellcount
+    ((index / self.width) % self.depth) % self.cellcount
   }
 
   fn index_z(&self, index: usize) -> usize {
-    (index / (self.width * self.height)) % self.cellcount
+    (index / (self.width * self.depth)) % self.cellcount
   }
 
   fn coord_index(&self, x: usize, y: usize, z: usize) -> usize {
-    (x + self.width * y + self.width * self.height * z) % self.cellcount
+    (x + self.width * y + self.width * self.depth * z) % self.cellcount
   }
 }
-
-

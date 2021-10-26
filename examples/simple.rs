@@ -6,12 +6,7 @@ fn main() {
   let iterations = 10;
   let mut successes = 0;
   let mut tileloader = TestLoader::new();
-  let mut wfc = WFC::new(
-    tileloader.load(),
-    10,
-    10,
-    0
-  );
+  let mut wfc = WFC::new(tileloader.load(), 10, 10, 10, 0);
 
   for i in 0..iterations {
     wfc.set_seed(i);
