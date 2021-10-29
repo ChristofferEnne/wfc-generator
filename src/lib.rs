@@ -8,6 +8,7 @@ use std::thread::yield_now;
 use std::{ffi::OsStr, io::Write};
 
 pub mod dir;
+pub mod fileimport;
 mod intersection;
 pub mod tiles;
 use dir::Direction;

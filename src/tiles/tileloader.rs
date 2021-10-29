@@ -5,9 +5,9 @@ use std::{
   path::{self, PathBuf}
 };
 
-use hashbrown::HashMap;
-
+use crate::fileimport::fbx::FBX;
 use crate::tiles::tile::Tile;
+use hashbrown::HashMap;
 
 pub trait TileLoader {
   fn tiles(&self) -> &Vec<Tile>;
@@ -302,6 +302,7 @@ impl TileLoader for DirectoryLoader {
       Err(e) => panic!("{}", e)
     };
 
+
     // Create the tiles vector
     self.tiles = Vec::new();
 
@@ -314,6 +315,8 @@ impl TileLoader for DirectoryLoader {
       if entry.path().extension() != Some(&OsStr::new("fbx")) {
         continue;
       }
+
+      FBX::parse_file(&entry.path());
 
       // appending tile to 'tiles' array list
       // file naming convention: name_left_back_right_front_turns.fbx
