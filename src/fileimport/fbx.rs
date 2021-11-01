@@ -1,9 +1,5 @@
-use regex::RegexSet;
-use std::{
-  fs::File,
-  io::{BufRead, BufReader},
-  path::Path
-};
+use regex::{Captures, Regex, RegexSet};
+use std::{fs::File, io::{BufRead, BufReader}, ops::RangeBounds, path::Path};
 
 enum Section {
   Vertice,
@@ -78,21 +74,54 @@ impl FBX {
   }
 
   pub fn parse_file(path: &Path) {
-    let scope_start = RegexSet::new(&[r"([[:alpha:]]+):\s+.+\{"]).unwrap();
-    let scope_end = RegexSet::new(&[r"\s+\}"]).unwrap();
+    let mut stack: Vec<String> = Vec::new();
+    let scope_start = Regex::new(r"([[:alpha:]]+):\s+.+\{").unwrap();
+    let scope_end = Regex::new(r"\s+\}").unwrap();
+
+    let vertrices_match = Regex::new(r"Vertices:\s+\*[0-9]s+\{").unwrap();
+    let polygonvertexindex_match = Regex::new(r"PolygonVertexIndex:\s+\*[0-9]s+\{").unwrap();
+    let array_cap = Regex::new(r"\s+a:\s+([[:alnum:]]+)").unwrap();
 
     let file = File::open(path).unwrap();
     let lines = BufReader::new(file).lines();
+
+    let mut mesh = FBX::new();
     for line in lines {
       if let Ok(l) = line {
-        if scope_start.matches(&l).matched_any() {
-          println!("# {}", l);
-        }
-        if scope_end.matches(&l).matched_any() {
-          println!("% {}", l);
+        let ln = l.to_string();
+        if stack.len() == 3 {
+          match *stack.last().unwrap() {
+            "Vertices" => {
+              let caps = array_cap.captures(&ln).unwrap();
+              for s in caps[0].split(',').collect::<Vec<&str>>() {
+                mesh.vertices.push(s.parse::<f32>().unwrap());
+              }
+            },
+            "PolygonVertexIndex" => {
+              let caps = array_cap.captures(&ln).unwrap();
+              for s in caps[0].split(',').collect::<Vec<&str>>() {
+                if s.contains('-') {
+                  mesh.vertices.push(s.replace("-", "").parse::<f32>().unwrap() -1_f32);
+                }
+              }
+            },
+            _ => {}
+          }
+        } else {
+          let caps_start = scope_start.captures(&ln).unwrap();
+          if let Some(cap) = caps_start.get(1).clone() {
+              stack.push(cap.as_str());
+          } else {
+            let caps_end = scope_end.captures(&ln).unwrap();
+            if let Some(_cap) = caps_end.get(1) {
+              stack.pop();
+            }
+          }
         }
       }
     }
+
+    
     // Iterate over and collect all of the matches.
     //let matches: Vec<_> = set.matches("foobar").into_iter().collect();
     //assert_eq!(matches, vec![0, 2, 3, 4, 6]);
