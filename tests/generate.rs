@@ -23,6 +23,7 @@ mod tests {
       }
     }
     wfc.draw(&tileloader.tiles());
+
     assert_eq!(successes, iterations);
   }
 

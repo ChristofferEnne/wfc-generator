@@ -5,7 +5,7 @@ use std::{
   path::{self, PathBuf}
 };
 
-use crate::fileimport::fbx::FBX;
+use crate::fileimport::mesh::Mesh;
 use crate::tiles::tile::Tile;
 use hashbrown::HashMap;
 
@@ -316,7 +316,7 @@ impl TileLoader for DirectoryLoader {
         continue;
       }
 
-      FBX::parse_file(&entry.path());
+      Mesh::parse_fbx(&entry.path());
 
       // appending tile to 'tiles' array list
       // file naming convention: name_left_back_right_front_turns.fbx
