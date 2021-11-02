@@ -11,20 +11,38 @@ enum Section {
   Triangle
 }
 
+
 #[derive(Debug)]
-pub(crate) struct Mesh {
-  vertices: Vec<f32>,
-  triangles: Vec<u32>
+pub(crate) struct Vertex {
+  x: f32,
+  y: f32,
+  z: f32,
 }
 
-/*
- */
+impl Vertex {
+    pub(crate) fn new(x: f32, y: f32, z: f32) -> Self { Self { x, y, z } }
+}
+
+#[derive(Debug)]
+pub(crate) struct Surface {
+  indexes: Vec<u32>,
+}
+
+impl Surface {
+    pub(crate) fn new() -> Self { Self { indexes: Vec::new() } }
+}
+
+#[derive(Debug)]
+pub(crate) struct Mesh {
+  vertices: Vec<Vertex>,
+  surfaces: Vec<Surface>
+}
 
 impl Mesh {
   pub(crate) fn new() -> Self {
     Self {
       vertices: Vec::new(),
-      triangles: Vec::new()
+      surfaces: Vec::new()
     }
   }
 
@@ -37,13 +55,19 @@ impl Mesh {
     let scope_start =
       Regex::new(r"([[:alpha:]][[:alnum:]]*):\s+.+\{").unwrap();
     let scope_end = Regex::new(r"\s*\}").unwrap();
+    let f_array_cap_v = Regex::new(r"
+    (?P<x>[0-9.E-]+),
+    (?P<y>[0-9.E-]+),
+    (?P<z>[0-9.E-]+)").unwrap();
     let idx_array_cap = Regex::new(r"\s+a:\s+([0-9,-]+)").unwrap();
-    let f_array_cap = Regex::new(r"\s+a:\s+([0-9,.E-]+)").unwrap();
+    
+    //let f_array_cap = Regex::new(r"\s+a:\s+([0-9,.E-]+)").unwrap();
 
     let file = File::open(path).unwrap();
     let lines = BufReader::new(file).lines();
 
     let mut mesh = Mesh::new();
+    let mut surface = Surface::new();
     for line in lines {
       if let Ok(l) = line {
         let ln = l.to_string();
@@ -59,20 +83,31 @@ impl Mesh {
           let m: &str = stack.last().unwrap().as_ref();
           match stack.last().unwrap().as_ref() {
             "Vertices" => {
-              let caps = f_array_cap.captures(&ln).unwrap();
-              //println!("cap: {:?}", caps);
-              for s in caps[1].split(',').collect::<Vec<&str>>() {
-                mesh.vertices.push(s.parse::<f32>().unwrap());
+              //let caps = f_array_cap.captures(&ln).unwrap();
+              for caps in f_array_cap_v.captures_iter(&ln) {
+                println!("X: {:?}, Y: {:?}, Z: {:?}",
+                  &caps["x"], &caps["y"], &caps["z"]);
+                  mesh.vertices.push(Vertex::new(
+                    caps["x"].parse::<f32>().unwrap(), 
+                    caps["y"].parse::<f32>().unwrap(), 
+                    caps["z"].parse::<f32>().unwrap()) );
               }
+
+              //println!("cap: {:?}", caps);
+              //for s in caps[1].split(',').collect::<Vec<&str>>() {
+              //  mesh.vertices.push(s.parse::<f32>().unwrap());
+              //}
             }
             "PolygonVertexIndex" => {
               let caps = idx_array_cap.captures(&ln).unwrap();
               //println!("cap: {:?}", caps);
               for s in caps[1].split(',').collect::<Vec<&str>>() {
                 if s.starts_with("-") {
-                  mesh.triangles.push(s[1..].parse::<u32>().unwrap() - 1);
+                  surface.indexes.push(s[1..].parse::<u32>().unwrap() - 1);
+                  mesh.surfaces.push(surface);
+                  surface = Surface::new();
                 } else {
-                  mesh.triangles.push(s.parse::<u32>().unwrap());
+                  surface.indexes.push(s.parse::<u32>().unwrap());
                 }
               }
             }
@@ -95,5 +130,9 @@ impl Mesh {
 
     println!("{:?}", mesh);
     mesh
+  }
+
+  pub fn get_links() {
+
   }
 }
