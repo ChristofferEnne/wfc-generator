@@ -3,6 +3,7 @@ Its mainly intended to be used with games and has been optimized to be very fast
 Given some tile data that can be generated with TileLoader this algorithm can generate map data.
 You can run examples/simple.rs to generate a very basic pattern:
 
+```
 ┘┌┘┌┼┼┐┌┼─┘│└┐│││┌─┘│ └┘│ └┐└┘  ││ └┘└─┼
 ┌┼─┘└┘│└┘┌┐│┌┘│└┘│┌┐└─┐┌┼─┐└───┐││ ┌───┘
 ┘│  ┌─┘ ┌┘└┼┘┌┼─┐└┘└┐┌┼┼┼┐│┌┐ ┌┼┼┼┐│┌───
@@ -13,6 +14,7 @@ You can run examples/simple.rs to generate a very basic pattern:
 ┐│└─┼┘└┐││  └┐ ┌┘└┼┘└┐│ ┌┐└─┼┼┘  └┼┐│  ┌
 ││┌┐└──┘└┘┌──┘┌┘  └┐ ││ │└─┐│└┐  ┌┘│└──┘
 │└┼┘┌┐  ┌─┼┐┌─┼┐┌──┼┐└┼┐│ ┌┘│┌┘ ┌┼─┼┐┌─┐
+```
 
 Features I want to implement:
 The ability to pann and colapse new cells.
