@@ -38,8 +38,7 @@ pub trait TileLoader {
     println!("{:?} - {:?}", flip_required.len(), flip_required);
 
     // Array A (for Adjacencies) is an index datastructure that describes the
-    // ways that the patterns can be placed near one another. More
-    // explanations below
+    // ways that the patterns can be placed near one another. More explanations below
     let mut adjancencies: Vec<[Vec<usize>; 4]> = Vec::with_capacity(self.tiles().len());
     for _ in 0..self.tiles().len() {
       adjancencies.push([vec![], vec![], vec![], vec![]]);
@@ -102,10 +101,10 @@ pub trait TileLoader {
   fn export(&mut self, path: PathBuf) {
     let display = path.display();
 
-    // Open a file in write-only mode, returns `io::Result<File>`
+    // Open a file in write-only mode
     let mut file = match File::create(&path) {
-      Err(why) => panic!("couldn't create {}: {}", display, why),
-      Ok(file) => file
+      Ok(f) => f,
+      Err(why) => panic!("couldn't create {}: {}", display, why)
     };
 
     // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
