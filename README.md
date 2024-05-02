@@ -17,7 +17,9 @@ You can run examples/simple.rs to generate a very basic pattern:
 ```
 
 Features I want to implement:
-- The ability to pann and colapse new cells.
 - Being able to provide a map with some colapsed cells and a script to randomly generate these from some conditions.
 - A weight system using tickets too influence tile selection when colapsing.
 - The ability to manually edit tiles and recolape neighboring cells.
+- The ability to pann and colapse new cells.
+
+This project is going to see a lot of changes being made to it. I will try not to break things too much but the goal is to get it into a more useful state as I plan on using this for a godot project.
