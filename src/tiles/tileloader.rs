@@ -198,7 +198,7 @@ impl TileLoader for TestLoader {
         "└".to_string(),
         "└".to_string(),
         0,
-        (0, 1, 1, 0, 0, 0),
+        (0, 1, 1, 0, 1, 1),
         (false, false, false, false)
       ),
       Tile::new(
@@ -206,7 +206,7 @@ impl TileLoader for TestLoader {
         "┌".to_string(),
         "┌".to_string(),
         1,
-        (0, 0, 1, 1, 0, 0),
+        (0, 0, 1, 1, 2, 2),
         (false, false, false, false)
       ),
       Tile::new(
@@ -214,7 +214,7 @@ impl TileLoader for TestLoader {
         "┐".to_string(),
         "┐".to_string(),
         2,
-        (1, 0, 0, 1, 0, 0),
+        (1, 0, 0, 1, 3, 3),
         (false, false, false, false)
       ),
       Tile::new(
@@ -222,7 +222,7 @@ impl TileLoader for TestLoader {
         "┘".to_string(),
         "┘".to_string(),
         3,
-        (1, 1, 0, 0, 0, 0),
+        (1, 1, 0, 0, 4, 4),
         (false, false, false, false)
       ),
       Tile::new(
@@ -230,7 +230,7 @@ impl TileLoader for TestLoader {
         "┼".to_string(),
         "┼".to_string(),
         0,
-        (1, 1, 1, 1, 0, 0),
+        (1, 1, 1, 1, 5, 5),
         (false, false, false, false)
       ),
       Tile::new(
@@ -238,7 +238,7 @@ impl TileLoader for TestLoader {
         "─".to_string(),
         "─".to_string(),
         0,
-        (1, 0, 1, 0, 0, 0),
+        (1, 0, 1, 0, 6, 6),
         (false, false, false, false)
       ),
       Tile::new(
@@ -246,7 +246,7 @@ impl TileLoader for TestLoader {
         "│".to_string(),
         "│".to_string(),
         0,
-        (0, 1, 0, 1, 0, 0),
+        (0, 1, 0, 1, 7, 7),
         (false, false, false, false)
       ),
     ];

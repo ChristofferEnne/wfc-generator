@@ -349,30 +349,38 @@ impl WFC {
 
   pub fn draw(&self, tiles: &Vec<Tile>) {
     println!("");
-    for y in 0..self.depth {
-      for x in 0..self.width {
-        if self.wave[(x + (y * self.width))].len() > 1 {
-          print!("{}", self.wave[(x + (y * self.width))].len());
-        } else {
-          let t = self.wave[(x + (y * self.width))].iter().next().unwrap();
-          print!("{}", tiles[*t].filename);
+    for z in 0..self.height {
+      for y in 0..self.depth {
+        for x in 0..self.width {
+          if self.wave[self.coord_index(x,y,z)].len() > 1 {
+            print!("{}", self.wave[self.coord_index(x,y,z)].len());
+          } else {
+            let t = self.wave[self.coord_index(x,y,z)].iter().next().unwrap();
+            print!("{}", tiles[*t].filename);
+          }
         }
+        println!("");
       }
+      println!("");
       println!("");
     }
   }
 
   pub fn draw_data(&self) {
     println!("");
-    for y in 0..self.depth {
-      for x in 0..self.width {
-        if self.wave[(x + (y * self.width))].len() > 1 {
-          print!("#,");
-        } else {
-          let t = self.wave[(x + (y * self.width))].iter().next().unwrap();
-          print!("{},", t);
+    for z in 0..self.height {
+      for y in 0..self.depth {
+        for x in 0..self.width {
+          if self.wave[self.coord_index(x,y,z)].len() > 1 {
+            print!("#,");
+          } else {
+            let t = self.wave[self.coord_index(x,y,z)].iter().next().unwrap();
+            print!("{},", t);
+          }
         }
+        println!("");
       }
+      println!("");
       println!("");
     }
   }
