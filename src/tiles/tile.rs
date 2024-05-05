@@ -4,7 +4,7 @@ pub struct Tile {
   pub filename: String,
   pub rotation: usize, // nr of extra rotation variants to create
   // each directions connector (socket-id, flipped)
-  pub connectors: ((usize, bool), (usize, bool), (usize, bool), (usize, bool))
+  pub connectors: ((usize, bool), (usize, bool), (usize, bool), (usize, bool), (usize, bool), (usize, bool))
 }
 
 impl Tile {
@@ -13,7 +13,7 @@ impl Tile {
     name: String,
     filename: String,
     rotation: usize,
-    connectors: ((usize, bool), (usize, bool), (usize, bool), (usize, bool))
+    connectors: ((usize, bool), (usize, bool), (usize, bool), (usize, bool), (usize, bool), (usize, bool)),
   ) -> Self {
     Self {
       id,

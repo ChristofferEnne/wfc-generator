@@ -21,34 +21,19 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
   group2.bench_function("complete", |b| {
     b.iter(|| {
-      let mut wfc = WFC::new(
-        links.clone(),
-        50,
-        50,
-        0
-      );
+      let mut wfc = WFC::new(links.clone(), 10, 10, 10, 0);
       wfc.generate();
     })
   });
 
   group2.bench_function("preallocation", |b| {
-    let mut wfc = WFC::new(
-      links.clone(),
-      50,
-      50,
-      0
-    );
+    let mut wfc = WFC::new(links.clone(), 10, 10, 10, 0);
     b.iter(|| {
       wfc.generate();
     })
   });
 
-  let mut wfc = WFC::new(
-    links.clone(),
-    50,
-    50,
-    0
-  );
+  let mut wfc = WFC::new(links.clone(), 10, 10, 10, 0);
   group2.bench_function("generate", |b| {
     b.iter(|| {
       wfc.generate();
